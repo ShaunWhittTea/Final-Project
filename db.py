@@ -11,7 +11,11 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL is not set.")
-    return connect(DATABASE_URL, row_factory=dict_row)
+    return connect(
+        DATABASE_URL,
+        row_factory=dict_row,
+        connect_timeout=5
+    )
 
 
 def init_db():
