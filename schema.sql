@@ -2,7 +2,8 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS games (
     game_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    status VARCHAR(20) NOT NULL CHECK (status IN ('waiting', 'active', 'completed')),
+    status VARCHAR(20) NOT NULL CHECK (status IN ('waiting','active','completed')),
+    current_turn_player_id UUID NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -21,29 +22,29 @@ CREATE TABLE IF NOT EXISTS game_players (
     player_id UUID NOT NULL,
     joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (game_id, player_id),
-    CONSTRAINT fk_game
-        FOREIGN KEY (game_id)
-        REFERENCES games(game_id)
-        ON DELETE CASCADE,
-    CONSTRAINT fk_player
-        FOREIGN KEY (player_id)
-        REFERENCES players(player_id)
-        ON DELETE CASCADE
+    FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE,
+    FOREIGN KEY (player_id) REFERENCES players(player_id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS moves (
-    move_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+CREATE TABLE IF NOT EXISTS ships (
+    ship_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     game_id UUID NOT NULL,
     player_id UUID NOT NULL,
-    move_number INT NOT NULL,
-    move_data JSONB NOT NULL,
+    ship_type VARCHAR(50) NOT NULL,
+    coordinates JSONB NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_move_game
-        FOREIGN KEY (game_id)
-        REFERENCES games(game_id)
-        ON DELETE CASCADE,
-    CONSTRAINT fk_move_player
-        FOREIGN KEY (player_id)
-        REFERENCES players(player_id)
-        ON DELETE CASCADE
+    FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE,
+    FOREIGN KEY (player_id) REFERENCES players(player_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS shots (
+    shot_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    game_id UUID NOT NULL,
+    attacker_player_id UUID NOT NULL,
+    target_player_id UUID NOT NULL,
+    row_index INT NOT NULL,
+    col_index INT NOT NULL,
+    result VARCHAR(20) NOT NULL CHECK (result IN ('hit','miss')),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE
 );
