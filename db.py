@@ -7,7 +7,6 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-
 def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL is not set.")
@@ -17,9 +16,9 @@ def get_conn():
         connect_timeout=5
     )
 
-
 def init_db():
     with get_conn() as conn:
         with open("schema.sql", "r", encoding="utf-8") as f:
             conn.execute(f.read())
         conn.commit()
+
