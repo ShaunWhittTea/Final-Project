@@ -46,8 +46,8 @@ def require_test_mode():
     return None
 
 
-def is_valid_uuid_text(value):
-    return isinstance(value, str) and len(value.strip()) > 0
+def is_valid_int_id(value):
+    return isinstance(value, int) and value > 0
 
 
 def get_player_row(cur, player_id):
@@ -83,8 +83,7 @@ def count_players_in_game(cur, game_id):
         """,
         (game_id,)
     )
-    row = cur.fetchone()
-    return row["count"]
+    return cur.fetchone()["count"]
 
 
 def get_turn_order_rows(cur, game_id):
@@ -122,16 +121,15 @@ def player_has_placed(cur, game_id, player_id):
         """,
         (game_id, player_id)
     )
-    row = cur.fetchone()
-    return row["count"] == SHIPS_PER_PLAYER
+    return cur.fetchone()["count"] == SHIPS_PER_PLAYER
 
 
 def all_players_placed(cur, game_id):
     cur.execute(
         """
-        SELECT gp.player_id
-        FROM game_players gp
-        WHERE gp.game_id = %s
+        SELECT player_id
+        FROM game_players
+        WHERE game_id = %s
         """,
         (game_id,)
     )
@@ -143,33 +141,21 @@ def all_players_placed(cur, game_id):
     for row in players:
         if not player_has_placed(cur, game_id, row["player_id"]):
             return False
+
     return True
 
 
 def active_player_ids(cur, game_id):
     cur.execute(
         """
-        SELECT gp.player_id
-        FROM game_players gp
-        WHERE gp.game_id = %s
-        ORDER BY gp.turn_order
+        SELECT player_id
+        FROM game_players
+        WHERE game_id = %s
+        ORDER BY turn_order
         """,
         (game_id,)
     )
     return [row["player_id"] for row in cur.fetchall()]
-
-
-def ships_for_player(cur, game_id, player_id):
-    cur.execute(
-        """
-        SELECT row_index, col_index
-        FROM ships
-        WHERE game_id = %s AND player_id = %s
-        ORDER BY row_index, col_index
-        """,
-        (game_id, player_id)
-    )
-    return cur.fetchall()
 
 
 def surviving_players(cur, game_id):
@@ -250,8 +236,8 @@ def normalize_ship_cells(raw_ships, grid_size):
 
         if (row, col) in seen:
             return None
-        seen.add((row, col))
 
+        seen.add((row, col))
         normalized.append((row, col))
 
     return normalized
@@ -306,7 +292,7 @@ def create_player():
                 player = cur.fetchone()
                 conn.commit()
 
-        return jsonify({"player_id": str(player["player_id"])}), 201
+        return jsonify({"player_id": player["player_id"]}), 201
 
     except UniqueViolation:
         return error_response("username already exists.", 400)
@@ -315,8 +301,8 @@ def create_player():
         return error_response("Failed to create player.", 500)
 
 
-@app.get("/api/players/<player_id>/stats")
-@app.get("/players/<player_id>")
+@app.get("/api/players/<int:player_id>/stats")
+@app.get("/players/<int:player_id>")
 def get_player_stats(player_id):
     try:
         with get_conn() as conn:
@@ -360,7 +346,7 @@ def create_game():
     grid_size = data.get("grid_size", DEFAULT_GRID_SIZE)
     max_players = data.get("max_players", DEFAULT_MAX_PLAYERS)
 
-    if not is_valid_uuid_text(creator_id):
+    if not is_valid_int_id(creator_id):
         return error_response("creator_id is required.", 400)
 
     if not isinstance(grid_size, int) or grid_size < MIN_GRID_SIZE or grid_size > MAX_GRID_SIZE:
@@ -400,7 +386,7 @@ def create_game():
                 conn.commit()
 
         return jsonify({
-            "game_id": str(game["game_id"]),
+            "game_id": game["game_id"],
             "grid_size": game["grid_size"],
             "status": game["status"],
             "current_turn_index": game["current_turn_index"],
@@ -412,12 +398,12 @@ def create_game():
         return error_response("Failed to create game.", 500)
 
 
-@app.post("/api/games/<game_id>/join")
+@app.post("/api/games/<int:game_id>/join")
 def join_game(game_id):
     data = parse_json()
     player_id = data.get("player_id")
 
-    if not is_valid_uuid_text(player_id):
+    if not is_valid_int_id(player_id):
         return error_response("player_id is required.", 400)
 
     try:
@@ -458,7 +444,7 @@ def join_game(game_id):
         return error_response("Failed to join game.", 500)
 
 
-@app.get("/api/games/<game_id>")
+@app.get("/api/games/<int:game_id>")
 def get_game(game_id):
     try:
         with get_conn() as conn:
@@ -472,7 +458,7 @@ def get_game(game_id):
         game_status = "finished" if game["status"] == "completed" else game["status"]
 
         return jsonify({
-            "game_id": str(game["game_id"]),
+            "game_id": game["game_id"],
             "grid_size": game["grid_size"],
             "status": game_status,
             "current_turn_index": game["current_turn_index"],
@@ -484,13 +470,13 @@ def get_game(game_id):
         return error_response("Failed to fetch game.", 500)
 
 
-@app.post("/api/games/<game_id>/place")
+@app.post("/api/games/<int:game_id>/place")
 def place_production_ships(game_id):
     data = parse_json()
     player_id = data.get("player_id")
     ships = data.get("ships")
 
-    if not is_valid_uuid_text(player_id):
+    if not is_valid_int_id(player_id):
         return error_response("player_id is required.", 400)
 
     try:
@@ -538,14 +524,14 @@ def place_production_ships(game_id):
         return error_response("Failed to place ships.", 500)
 
 
-@app.post("/api/games/<game_id>/fire")
+@app.post("/api/games/<int:game_id>/fire")
 def fire(game_id):
     data = parse_json()
     player_id = data.get("player_id")
     row = data.get("row")
     col = data.get("col")
 
-    if not is_valid_uuid_text(player_id):
+    if not is_valid_int_id(player_id):
         return error_response("player_id is required.", 400)
 
     if not isinstance(row, int) or not isinstance(col, int):
@@ -671,7 +657,7 @@ def fire(game_id):
                 "result": result,
                 "next_player_id": None,
                 "game_status": "finished",
-                "winner_id": str(winner_id)
+                "winner_id": winner_id
             }), 200
 
         with get_conn() as conn:
@@ -692,7 +678,7 @@ def fire(game_id):
 
         return jsonify({
             "result": result,
-            "next_player_id": str(next_row["player_id"]) if next_row else None,
+            "next_player_id": next_row["player_id"] if next_row else None,
             "game_status": "active"
         }), 200
 
@@ -703,7 +689,7 @@ def fire(game_id):
         return error_response("Failed to fire.", 500)
 
 
-@app.get("/api/games/<game_id>/moves")
+@app.get("/api/games/<int:game_id>/moves")
 def get_moves(game_id):
     try:
         with get_conn() as conn:
@@ -725,9 +711,9 @@ def get_moves(game_id):
 
         return jsonify([
             {
-                "shot_id": str(shot["shot_id"]),
-                "attacker_player_id": str(shot["attacker_player_id"]),
-                "target_player_id": str(shot["target_player_id"]),
+                "shot_id": shot["shot_id"],
+                "attacker_player_id": shot["attacker_player_id"],
+                "target_player_id": shot["target_player_id"],
                 "row": shot["row_index"],
                 "col": shot["col_index"],
                 "result": shot["result"],
@@ -741,8 +727,8 @@ def get_moves(game_id):
         return error_response("Failed to fetch moves.", 500)
 
 
-@app.post("/api/test/games/<game_id>/restart")
-@app.post("/api/test/games/<game_id>/reset")
+@app.post("/api/test/games/<int:game_id>/restart")
+@app.post("/api/test/games/<int:game_id>/reset")
 def test_restart(game_id):
     test_check = require_test_mode()
     if test_check:
@@ -775,7 +761,7 @@ def test_restart(game_id):
         return error_response("Failed to restart game.", 500)
 
 
-@app.post("/api/test/games/<game_id>/ships")
+@app.post("/api/test/games/<int:game_id>/ships")
 def test_place_ships(game_id):
     test_check = require_test_mode()
     if test_check:
@@ -785,7 +771,7 @@ def test_place_ships(game_id):
     player_id = data.get("player_id") or data.get("playerId")
     raw_ships = data.get("ships")
 
-    if not is_valid_uuid_text(player_id):
+    if not is_valid_int_id(player_id):
         return error_response("player_id is required.", 400)
 
     try:
@@ -838,17 +824,17 @@ def test_place_ships(game_id):
         return error_response("Failed to place test ships.", 500)
 
 
-@app.get("/api/test/games/<game_id>/board/<player_id>")
-@app.get("/api/test/games/<game_id>/board")
+@app.get("/api/test/games/<int:game_id>/board/<int:player_id>")
+@app.get("/api/test/games/<int:game_id>/board")
 def test_board(game_id, player_id=None):
     test_check = require_test_mode()
     if test_check:
         return test_check
 
     if player_id is None:
-        player_id = request.args.get("playerId") or request.args.get("player_id")
+        player_id = request.args.get("playerId", type=int) or request.args.get("player_id", type=int)
 
-    if not is_valid_uuid_text(player_id):
+    if not is_valid_int_id(player_id):
         return error_response("player_id is required.", 400)
 
     try:
@@ -907,7 +893,7 @@ def test_board(game_id, player_id=None):
         return error_response("Failed to fetch board.", 500)
 
 
-@app.post("/api/test/games/<game_id>/set-turn")
+@app.post("/api/test/games/<int:game_id>/set-turn")
 def test_set_turn(game_id):
     test_check = require_test_mode()
     if test_check:
@@ -916,7 +902,7 @@ def test_set_turn(game_id):
     data = parse_json()
     player_id = data.get("player_id") or data.get("playerId")
 
-    if not is_valid_uuid_text(player_id):
+    if not is_valid_int_id(player_id):
         return error_response("player_id is required.", 400)
 
     try:
