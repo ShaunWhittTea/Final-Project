@@ -21,4 +21,3 @@ def init_db():
         with open("schema.sql", "r", encoding="utf-8") as f:
             conn.execute(f.read())
         conn.commit()
-
