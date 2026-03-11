@@ -1,26 +1,11 @@
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+DROP TABLE IF EXISTS shots CASCADE;
+DROP TABLE IF EXISTS ships CASCADE;
+DROP TABLE IF EXISTS game_players CASCADE;
+DROP TABLE IF EXISTS games CASCADE;
+DROP TABLE IF EXISTS players CASCADE;
 
-CREATE TABLE IF NOT EXISTS games (
-    game_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    status VARCHAR(20) NOT NULL DEFAULT 'waiting'
-        CHECK (status IN ('waiting', 'active', 'completed')),
-    grid_size INT NOT NULL DEFAULT 10,
-    max_players INT NOT NULL DEFAULT 2,
-    current_turn_index INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-ALTER TABLE games
-    ADD COLUMN IF NOT EXISTS grid_size INT NOT NULL DEFAULT 10;
-
-ALTER TABLE games
-    ADD COLUMN IF NOT EXISTS max_players INT NOT NULL DEFAULT 2;
-
-ALTER TABLE games
-    ADD COLUMN IF NOT EXISTS current_turn_index INT NOT NULL DEFAULT 0;
-
-CREATE TABLE IF NOT EXISTS players (
-    player_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+CREATE TABLE players (
+    player_id SERIAL PRIMARY KEY,
     display_name VARCHAR(100) NOT NULL UNIQUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     total_games INT NOT NULL DEFAULT 0,
@@ -29,9 +14,21 @@ CREATE TABLE IF NOT EXISTS players (
     total_moves INT NOT NULL DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS game_players (
-    game_id UUID NOT NULL,
-    player_id UUID NOT NULL,
+CREATE TABLE games (
+    game_id SERIAL PRIMARY KEY,
+    status VARCHAR(20) NOT NULL DEFAULT 'waiting'
+        CHECK (status IN ('waiting', 'active', 'completed')),
+    grid_size INT NOT NULL DEFAULT 8
+        CHECK (grid_size BETWEEN 5 AND 15),
+    max_players INT NOT NULL DEFAULT 2
+        CHECK (max_players >= 1),
+    current_turn_index INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE game_players (
+    game_id INT NOT NULL,
+    player_id INT NOT NULL,
     turn_order INT NOT NULL DEFAULT 0,
     joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -45,33 +42,20 @@ CREATE TABLE IF NOT EXISTS game_players (
     CONSTRAINT fk_game_players_player
         FOREIGN KEY (player_id)
         REFERENCES players(player_id)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT unique_turn_order_per_game
+        UNIQUE (game_id, turn_order)
 );
 
-ALTER TABLE game_players
-    ADD COLUMN IF NOT EXISTS turn_order INT NOT NULL DEFAULT 0;
-
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'unique_turn_order_per_game'
-    ) THEN
-        ALTER TABLE game_players
-        ADD CONSTRAINT unique_turn_order_per_game
-        UNIQUE (game_id, turn_order);
-    END IF;
-END $$;
-
-CREATE TABLE IF NOT EXISTS ships (
-    ship_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    game_id UUID NOT NULL,
-    player_id UUID NOT NULL,
+CREATE TABLE ships (
+    ship_id SERIAL PRIMARY KEY,
+    game_id INT NOT NULL,
+    player_id INT NOT NULL,
     ship_type VARCHAR(50) NOT NULL DEFAULT 'single',
     coordinates JSONB NOT NULL,
-    row_index INT,
-    col_index INT,
+    row_index INT NOT NULL,
+    col_index INT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_ship_game
@@ -82,33 +66,17 @@ CREATE TABLE IF NOT EXISTS ships (
     CONSTRAINT fk_ship_player
         FOREIGN KEY (player_id)
         REFERENCES players(player_id)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT unique_ship_cell_per_player
+        UNIQUE (game_id, player_id, row_index, col_index)
 );
 
-ALTER TABLE ships
-    ADD COLUMN IF NOT EXISTS row_index INT;
-
-ALTER TABLE ships
-    ADD COLUMN IF NOT EXISTS col_index INT;
-
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'unique_ship_cell_per_player'
-    ) THEN
-        ALTER TABLE ships
-        ADD CONSTRAINT unique_ship_cell_per_player
-        UNIQUE (game_id, player_id, row_index, col_index);
-    END IF;
-END $$;
-
-CREATE TABLE IF NOT EXISTS shots (
-    shot_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    game_id UUID NOT NULL,
-    attacker_player_id UUID NOT NULL,
-    target_player_id UUID NOT NULL,
+CREATE TABLE shots (
+    shot_id SERIAL PRIMARY KEY,
+    game_id INT NOT NULL,
+    attacker_player_id INT NOT NULL,
+    target_player_id INT NOT NULL,
     row_index INT NOT NULL,
     col_index INT NOT NULL,
     result VARCHAR(20) NOT NULL CHECK (result IN ('hit', 'miss')),
@@ -127,18 +95,8 @@ CREATE TABLE IF NOT EXISTS shots (
     CONSTRAINT fk_shot_target
         FOREIGN KEY (target_player_id)
         REFERENCES players(player_id)
-        ON DELETE CASCADE
-);
+        ON DELETE CASCADE,
 
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'unique_shot_per_cell'
-    ) THEN
-        ALTER TABLE shots
-        ADD CONSTRAINT unique_shot_per_cell
-        UNIQUE (game_id, target_player_id, row_index, col_index);
-    END IF;
-END $$;
+    CONSTRAINT unique_shot_per_cell
+        UNIQUE (game_id, target_player_id, row_index, col_index)
+);
