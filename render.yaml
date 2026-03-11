@@ -8,5 +8,4 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: TEST_PASSWORD
-        sync: false
+
