@@ -156,7 +156,6 @@ def create_player():
         return jsonify({
             "playerId": str(player["player_id"]),
             "username": player["display_name"],
-            "displayName": player["display_name"],
             "createdAt": player["created_at"].isoformat(),
             "totalGames": player["total_games"],
             "totalWins": player["total_wins"],
@@ -194,7 +193,6 @@ def get_player(player_id):
         return jsonify({
             "playerId": str(player["player_id"]),
             "username": player["display_name"],
-            "displayName": player["display_name"],
             "createdAt": player["created_at"].isoformat(),
             "totalGames": player["total_games"],
             "totalWins": player["total_wins"],
@@ -335,7 +333,6 @@ def join_game(game_id):
             "gameId": str(game["game_id"]),
             "playerId": str(player["player_id"]),
             "username": player["display_name"],
-            "playerName": player["display_name"],
             "status": game["status"],
             "gridSize": game["grid_size"]
         }), 201
