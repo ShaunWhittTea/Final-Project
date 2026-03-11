@@ -1,5 +1,5 @@
-import os
 import json
+import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -9,7 +9,6 @@ from db import get_conn, init_db
 
 load_dotenv()
 
-TEST_PASSWORD = os.getenv("TEST_PASSWORD")
 DEFAULT_GRID_SIZE = 10
 MIN_GRID_SIZE = 5
 MAX_GRID_SIZE = 15
@@ -25,13 +24,6 @@ except Exception as ex:
 
 def error_response(message, status=400):
     return jsonify({"error": message}), status
-
-
-def require_test_mode():
-    header = request.headers.get("X-Test-Mode")
-    if not TEST_PASSWORD or header != TEST_PASSWORD:
-        return error_response("Forbidden.", 403)
-    return None
 
 
 def validate_grid_size(value):
@@ -127,10 +119,12 @@ def compute_board_state(conn, game_id, player_id):
 
 
 @app.get("/api/health")
+@app.get("/health")
 def health():
     return jsonify({"status": "ok"}), 200
 
 
+@app.post("/api/players")
 @app.post("/players")
 def create_player():
     data = request.get_json(silent=True) or {}
@@ -177,6 +171,7 @@ def create_player():
         return error_response("Failed to create player.", 500)
 
 
+@app.get("/api/players/<player_id>")
 @app.get("/players/<player_id>")
 def get_player(player_id):
     try:
@@ -212,6 +207,7 @@ def get_player(player_id):
         return error_response("Failed to fetch player.", 500)
 
 
+@app.post("/api/games")
 @app.post("/games")
 def create_game():
     data = request.get_json(silent=True) or {}
@@ -253,6 +249,7 @@ def create_game():
         return error_response("Failed to create game.", 500)
 
 
+@app.post("/api/games/<game_id>/join")
 @app.post("/games/<game_id>/join")
 def join_game(game_id):
     data = request.get_json(silent=True) or {}
@@ -295,7 +292,11 @@ def join_game(game_id):
                     if not player:
                         return error_response("Player not found.", 404)
                 else:
+                    if not isinstance(username, str) or not username.strip():
+                        return error_response("username is required.", 400)
+
                     username = username.strip()
+
                     cur.execute(
                         """
                         SELECT player_id, display_name
@@ -344,12 +345,9 @@ def join_game(game_id):
         return error_response("Failed to join game.", 500)
 
 
+@app.post("/api/test/games/<game_id>/ships")
 @app.post("/test/games/<game_id>/ships")
 def place_ships(game_id):
-    test_check = require_test_mode()
-    if test_check:
-        return test_check
-
     data = request.get_json(silent=True) or {}
     player_id = data.get("playerId")
     ships = data.get("ships")
@@ -447,12 +445,9 @@ def place_ships(game_id):
         return error_response("Failed to place ships.", 500)
 
 
+@app.get("/api/test/games/<game_id>/board")
 @app.get("/test/games/<game_id>/board")
 def reveal_board(game_id):
-    test_check = require_test_mode()
-    if test_check:
-        return test_check
-
     player_id = request.args.get("playerId")
     if not player_id:
         return error_response("playerId is required.", 400)
@@ -499,12 +494,9 @@ def reveal_board(game_id):
         return error_response("Failed to fetch board.", 500)
 
 
+@app.post("/api/test/games/<game_id>/reset")
 @app.post("/test/games/<game_id>/reset")
 def reset_game(game_id):
-    test_check = require_test_mode()
-    if test_check:
-        return test_check
-
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
@@ -548,12 +540,9 @@ def reset_game(game_id):
         return error_response("Failed to reset game.", 500)
 
 
+@app.post("/api/test/games/<game_id>/set-turn")
 @app.post("/test/games/<game_id>/set-turn")
 def set_turn(game_id):
-    test_check = require_test_mode()
-    if test_check:
-        return test_check
-
     data = request.get_json(silent=True) or {}
     player_id = data.get("playerId")
 
