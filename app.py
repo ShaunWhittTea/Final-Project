@@ -293,6 +293,62 @@ def normalize_test_ships(raw_ships, grid_size):
     return normalized
 
 
+def group_test_ships(cur, game_id, player_id):
+    cur.execute(
+        """
+        SELECT ship_type, coordinates
+        FROM ships
+        WHERE game_id = %s AND player_id = %s
+        ORDER BY ship_id
+        """,
+        (game_id, player_id)
+    )
+    rows = cur.fetchall()
+
+    grouped = []
+    seen = set()
+
+    for row in rows:
+        ship_type = row["ship_type"]
+        coordinates = row["coordinates"]
+
+        coord_key = tuple(tuple(cell) for cell in coordinates)
+        key = (ship_type, coord_key)
+
+        if key in seen:
+            continue
+        seen.add(key)
+
+        grouped.append({
+            "type": ship_type,
+            "coordinates": coordinates
+        })
+
+    return grouped
+
+
+def compute_sunk_for_player(cur, game_id, player_id):
+    ships = group_test_ships(cur, game_id, player_id)
+
+    cur.execute(
+        """
+        SELECT row_index, col_index
+        FROM shots
+        WHERE game_id = %s AND target_player_id = %s AND result = 'hit'
+        """,
+        (game_id, player_id)
+    )
+    hit_cells = {(row["row_index"], row["col_index"]) for row in cur.fetchall()}
+
+    sunk = []
+    for ship in ships:
+        coords = ship["coordinates"]
+        if all((cell[0], cell[1]) in hit_cells for cell in coords):
+            sunk.append(ship)
+
+    return sunk
+
+
 @app.get("/api/health")
 def health():
     return jsonify({"status": "ok"}), 200
@@ -779,6 +835,7 @@ def get_moves(game_id):
 
 @app.post("/api/test/games/<int:game_id>/restart")
 @app.post("/api/test/games/<int:game_id>/reset")
+@app.post("/test/games/<int:game_id>/reset")
 def test_restart(game_id):
     test_check = require_test_mode()
     if test_check:
@@ -812,13 +869,17 @@ def test_restart(game_id):
 
 
 @app.post("/api/test/games/<int:game_id>/ships")
+@app.post("/test/games/<int:game_id>/ships")
 def test_place_ships(game_id):
     test_check = require_test_mode()
     if test_check:
         return test_check
 
     data = parse_json()
-    player_id = data.get("player_id") or data.get("playerId")
+    player_id = data.get("player_id")
+    if player_id is None:
+        player_id = data.get("playerId")
+
     raw_ships = data.get("ships")
 
     if not is_valid_int_id(player_id):
@@ -856,6 +917,7 @@ def test_place_ships(game_id):
                 for ship in normalized:
                     ship_type = ship["type"]
                     coords = ship["coordinates"]
+                    coords_json = json.dumps([[row, col] for row, col in coords])
 
                     for row, col in coords:
                         cur.execute(
@@ -867,7 +929,7 @@ def test_place_ships(game_id):
                                 game_id,
                                 player_id,
                                 ship_type,
-                                json.dumps([[row, col]]),
+                                coords_json,
                                 row,
                                 col
                             )
@@ -875,7 +937,12 @@ def test_place_ships(game_id):
 
                 conn.commit()
 
-        return jsonify({"status": "placed"}), 200
+        return jsonify({
+            "success": True,
+            "status": "placed",
+            "game_id": game_id,
+            "player_id": player_id
+        }), 200
 
     except UniqueViolation:
         return error_response("Duplicate ship cell.", 400)
@@ -886,6 +953,7 @@ def test_place_ships(game_id):
 
 @app.get("/api/test/games/<int:game_id>/board/<int:player_id>")
 @app.get("/api/test/games/<int:game_id>/board")
+@app.get("/test/games/<int:game_id>/board")
 def test_board(game_id, player_id=None):
     test_check = require_test_mode()
     if test_check:
@@ -908,16 +976,7 @@ def test_board(game_id, player_id=None):
                 if not membership:
                     return error_response("Player not in game.", 403)
 
-                cur.execute(
-                    """
-                    SELECT row_index, col_index
-                    FROM ships
-                    WHERE game_id = %s AND player_id = %s
-                    ORDER BY row_index, col_index
-                    """,
-                    (game_id, player_id)
-                )
-                ships = [{"row": row["row_index"], "col": row["col_index"]} for row in cur.fetchall()]
+                ships = group_test_ships(cur, game_id, player_id)
 
                 cur.execute(
                     """
@@ -928,7 +987,7 @@ def test_board(game_id, player_id=None):
                     """,
                     (game_id, player_id)
                 )
-                hits = [{"row": row["row_index"], "col": row["col_index"]} for row in cur.fetchall()]
+                hits = [[row["row_index"], row["col_index"]] for row in cur.fetchall()]
 
                 cur.execute(
                     """
@@ -939,13 +998,16 @@ def test_board(game_id, player_id=None):
                     """,
                     (game_id, player_id)
                 )
-                misses = [{"row": row["row_index"], "col": row["col_index"]} for row in cur.fetchall()]
+                misses = [[row["row_index"], row["col_index"]] for row in cur.fetchall()]
+
+                sunk = compute_sunk_for_player(cur, game_id, player_id)
 
         return jsonify({
             "player_id": player_id,
             "ships": ships,
             "hits": hits,
-            "misses": misses
+            "misses": misses,
+            "sunk": sunk
         }), 200
 
     except Exception as ex:
@@ -954,13 +1016,16 @@ def test_board(game_id, player_id=None):
 
 
 @app.post("/api/test/games/<int:game_id>/set-turn")
+@app.post("/test/games/<int:game_id>/set-turn")
 def test_set_turn(game_id):
     test_check = require_test_mode()
     if test_check:
         return test_check
 
     data = parse_json()
-    player_id = data.get("player_id") or data.get("playerId")
+    player_id = data.get("player_id")
+    if player_id is None:
+        player_id = data.get("playerId")
 
     if not is_valid_int_id(player_id):
         return error_response("player_id is required.", 400)
