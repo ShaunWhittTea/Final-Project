@@ -243,6 +243,56 @@ def normalize_ship_cells(raw_ships, grid_size):
     return normalized
 
 
+def normalize_test_ships(raw_ships, grid_size):
+    if not isinstance(raw_ships, list) or not raw_ships:
+        return None
+
+    normalized = []
+    occupied = set()
+
+    for ship in raw_ships:
+        if not isinstance(ship, dict):
+            return None
+
+        ship_type = ship.get("type", "single")
+        coordinates = ship.get("coordinates")
+
+        if coordinates is None and "row" in ship and "col" in ship:
+            coordinates = [[ship.get("row"), ship.get("col")]]
+
+        if not isinstance(coordinates, list) or not coordinates:
+            return None
+
+        cleaned_coords = []
+
+        for cell in coordinates:
+            if (
+                not isinstance(cell, list)
+                or len(cell) != 2
+                or not isinstance(cell[0], int)
+                or not isinstance(cell[1], int)
+            ):
+                return None
+
+            row, col = cell
+
+            if row < 0 or row >= grid_size or col < 0 or col >= grid_size:
+                return None
+
+            if (row, col) in occupied:
+                return None
+
+            occupied.add((row, col))
+            cleaned_coords.append((row, col))
+
+        normalized.append({
+            "type": ship_type,
+            "coordinates": cleaned_coords
+        })
+
+    return normalized
+
+
 @app.get("/api/health")
 def health():
     return jsonify({"status": "ok"}), 200
@@ -791,9 +841,9 @@ def test_place_ships(game_id):
                 if not membership:
                     return error_response("Player not in game.", 403)
 
-                normalized = normalize_ship_cells(raw_ships, game["grid_size"])
+                normalized = normalize_test_ships(raw_ships, game["grid_size"])
                 if normalized is None:
-                    return error_response("Exactly 3 valid single-cell ships are required.", 400)
+                    return error_response("Invalid ship coordinates.", 400)
 
                 cur.execute(
                     """
@@ -803,16 +853,26 @@ def test_place_ships(game_id):
                     (game_id, player_id)
                 )
 
-                for row, col in normalized:
-                    cur.execute(
-                        """
-                        INSERT INTO ships (game_id, player_id, ship_type, coordinates, row_index, col_index)
-                        VALUES (%s, %s, 'single', %s::jsonb, %s, %s)
-                        """,
-                        (game_id, player_id, json.dumps([[row, col]]), row, col)
-                    )
+                for ship in normalized:
+                    ship_type = ship["type"]
+                    coords = ship["coordinates"]
 
-                update_game_to_active_if_ready(cur, game_id)
+                    for row, col in coords:
+                        cur.execute(
+                            """
+                            INSERT INTO ships (game_id, player_id, ship_type, coordinates, row_index, col_index)
+                            VALUES (%s, %s, %s, %s::jsonb, %s, %s)
+                            """,
+                            (
+                                game_id,
+                                player_id,
+                                ship_type,
+                                json.dumps([[row, col]]),
+                                row,
+                                col
+                            )
+                        )
+
                 conn.commit()
 
         return jsonify({"status": "placed"}), 200
