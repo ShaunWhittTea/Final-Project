@@ -2,7 +2,7 @@
 
 ## Team Members
 - Shaun Whitt
-- Jack Striver
+- Jack Stivers
 
 ## Project Overview
 This project implements a server-managed multiplayer Battleship system that coordinates players, enforces game rules, and maintains persistent game state. The system allows multiple players to participate in Battleship games where a central server manages gameplay, validates moves, enforces turn order, and tracks game outcomes. The goal of the project is to demonstrate proper API design, persistent storage, multiplayer game logic, and engineering discipline throughout development.
@@ -51,14 +51,16 @@ The API supports functionality such as:
 
 ## Human + AI Roles
 ### Human Responsibilities
-Team members were responsible for:
-- Defining the product requirements
+Shaun Whitt was responsible for:
 - Designing the system architecture
 - Implementing the application logic
 - Writing and debugging code
+- Defining the product requirements
+Jack Stivers was responsible for:
 - Testing functionality
 - Ensuring regression discipline
 - Managing version control and commits
+- updating the repository README as the project evolves
 
 ### AI Responsibilities
 AI tools were used as an assistive resource to:
