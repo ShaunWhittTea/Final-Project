@@ -51,7 +51,7 @@ The API supports functionality such as:
 
 ## Human + AI Roles
 ### Human Responsibilities
-- Team members were responsible for:
+Team members were responsible for:
 - Defining the product requirements
 - Designing the system architecture
 - Implementing the application logic
@@ -60,8 +60,8 @@ The API supports functionality such as:
 - Ensuring regression discipline
 - Managing version control and commits
 
-## AI Responsibilities
-### AI tools were used as an assistive resource to:
+### AI Responsibilities
+AI tools were used as an assistive resource to:
 - Provide explanations of programming concepts
 - Suggest potential approaches to problems
 - Help refine documentation and structure
