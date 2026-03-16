@@ -1,4 +1,4 @@
-# Multiplayer Battleship System - CPSC 3750 – Web Application Development
+# Multiplayer Battleship System - CPSC 3750
 
 ## Team Members
 - Shaun Whitt
