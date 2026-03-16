@@ -1,6 +1,4 @@
-# Multiplayer Battleship System
-## CPSC 3750 – Web Application Development
-## Clemson University
+# Multiplayer Battleship System - CPSC 3750 – Web Application Development
 
 ## Team Members
 - Shaun Whitt
