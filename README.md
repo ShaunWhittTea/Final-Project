@@ -56,6 +56,7 @@ Shaun Whitt was responsible for:
 - Implementing the application logic
 - Writing and debugging code
 - Defining the product requirements
+
 Jack Stivers was responsible for:
 - Testing functionality
 - Ensuring regression discipline
