@@ -1,8 +1,8 @@
-* Multiplayer Battleship System
-** CPSC 3750 – Web Application Development
-** Clemson University
+*Multiplayer Battleship System
+**CPSC 3750 – Web Application Development
+**Clemson University
 
-*** Team Members
+***Team Members
 - Shaun Whitt
 - Jack Striver
 
@@ -77,17 +77,17 @@ Tracking player statistics
 
 All client interactions with the system occur through these HTTP endpoints.
 
-** AI Tools Used
-*** The following AI tools were used during development:
+**AI Tools Used
+***The following AI tools were used during development:
 - ChatGPT
-*** AI was used primarily for:
+***AI was used primarily for:
 - Assisting with brainstorming architecture ideas
 - Explaining technical concepts
 - Helping generate example code structures
 - Reviewing and improving documentation
 
-** Human + AI Roles
-*** Human Responsibilities
+**Human + AI Roles
+***Human Responsibilities
 - Team members were responsible for:
 - Defining the product requirements
 - Designing the system architecture
@@ -97,8 +97,8 @@ All client interactions with the system occur through these HTTP endpoints.
 - Ensuring regression discipline
 - Managing version control and commits
 
-** AI Responsibilities
-*** AI tools were used as an assistive resource to:
+**AI Responsibilities
+***AI tools were used as an assistive resource to:
 - Provide explanations of programming concepts
 - Suggest potential approaches to problems
 - Help refine documentation and structure
