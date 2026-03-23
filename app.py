@@ -394,7 +394,7 @@ def create_player():
                 player = cur.fetchone()
                 conn.commit()
 
-        return jsonify({"player_id": player["player_id"]}), 200
+        return jsonify({"player_id": player["player_id"]}), 201
 
     except UniqueViolation:
         return error_response("username already exists.", 400)
@@ -493,7 +493,7 @@ def create_game():
             "status": game["status"],
             "current_turn_index": game["current_turn_index"],
             "active_players": 1
-        }), 200
+        }), 201
 
     except Exception as ex:
         print(f"Create game error: {ex}")
