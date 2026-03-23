@@ -1,10 +1,4 @@
-DROP TABLE IF EXISTS shots CASCADE;
-DROP TABLE IF EXISTS ships CASCADE;
-DROP TABLE IF EXISTS game_players CASCADE;
-DROP TABLE IF EXISTS games CASCADE;
-DROP TABLE IF EXISTS players CASCADE;
-
-CREATE TABLE players (
+CREATE TABLE IF NOT EXISTS players (
     player_id SERIAL PRIMARY KEY,
     display_name VARCHAR(100) NOT NULL UNIQUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -14,10 +8,10 @@ CREATE TABLE players (
     total_moves INT NOT NULL DEFAULT 0
 );
 
-CREATE TABLE games (
+CREATE TABLE IF NOT EXISTS games (
     game_id SERIAL PRIMARY KEY,
     status VARCHAR(20) NOT NULL DEFAULT 'waiting'
-        CHECK (status IN ('waiting', 'active', 'completed')),
+        CHECK (status IN ('waiting', 'active', 'completed', 'finished')),
     grid_size INT NOT NULL DEFAULT 8
         CHECK (grid_size BETWEEN 5 AND 15),
     max_players INT NOT NULL DEFAULT 2
@@ -26,7 +20,7 @@ CREATE TABLE games (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE game_players (
+CREATE TABLE IF NOT EXISTS game_players (
     game_id INT NOT NULL,
     player_id INT NOT NULL,
     turn_order INT NOT NULL DEFAULT 0,
@@ -48,7 +42,7 @@ CREATE TABLE game_players (
         UNIQUE (game_id, turn_order)
 );
 
-CREATE TABLE ships (
+CREATE TABLE IF NOT EXISTS ships (
     ship_id SERIAL PRIMARY KEY,
     game_id INT NOT NULL,
     player_id INT NOT NULL,
@@ -72,7 +66,7 @@ CREATE TABLE ships (
         UNIQUE (game_id, player_id, row_index, col_index)
 );
 
-CREATE TABLE shots (
+CREATE TABLE IF NOT EXISTS shots (
     shot_id SERIAL PRIMARY KEY,
     game_id INT NOT NULL,
     attacker_player_id INT NOT NULL,
