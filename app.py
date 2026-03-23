@@ -359,11 +359,7 @@ def system_reset():
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM shots")
-                cur.execute("DELETE FROM ships")
-                cur.execute("DELETE FROM game_players")
-                cur.execute("DELETE FROM games")
-                cur.execute("DELETE FROM players")
+                cur.execute("TRUNCATE TABLE shots, ships, game_players, games, players RESTART IDENTITY CASCADE")
                 conn.commit()
         return jsonify({"status": "reset"}), 200
     except Exception as ex:
@@ -523,6 +519,9 @@ def join_game(game_id):
                 if not player:
                     return error_response("Invalid player_id.", 403)
 
+                if game["status"] != "waiting":
+                    return error_response("Game is not accepting new players.", 409)
+
                 existing = player_in_game(cur, game_id, player_id)
                 if existing:
                     return error_response("Player already joined this game.", 400)
@@ -649,6 +648,15 @@ def fire(game_id):
                 game = get_game_row(cur, game_id)
                 if not game:
                     return error_response("Game not found.", 404)
+
+                if game["status"] == "waiting":
+                    if not all_players_placed(cur, game_id):
+                        return error_response("All players must place ships before firing.", 409)
+                    update_game_to_active_if_ready(cur, game_id)
+                    game = get_game_row(cur, game_id)
+
+                if game["status"] in ("completed", "finished"):
+                    return error_response("Game already finished.", 409)
 
                 if game["status"] != "active":
                     return error_response("Game not active.", 403)
@@ -935,6 +943,7 @@ def test_place_ships(game_id):
                             )
                         )
 
+                update_game_to_active_if_ready(cur, game_id)
                 conn.commit()
 
         return jsonify({
