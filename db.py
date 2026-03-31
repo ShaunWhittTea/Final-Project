@@ -1,22 +1,23 @@
 import os
-from pathlib import Path
-import psycopg
+from psycopg import connect
+from psycopg.rows import dict_row
+from dotenv import load_dotenv
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+load_dotenv()
 
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-def get_db():
-    conn = psycopg.connect(DATABASE_URL)
-    conn.autocommit = True
-    return conn
-
+def get_conn():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is not set.")
+    return connect(
+        DATABASE_URL,
+        row_factory=dict_row,
+        connect_timeout=5
+    )
 
 def init_db():
-    schema_path = Path(__file__).with_name("schema.sql")
-
-    conn = get_db()
-    try:
-        with conn.cursor() as cur, open(schema_path, "r", encoding="utf-8") as f:
-            cur.execute(f.read())
-    finally:
-        conn.close()
+    with get_conn() as conn:
+        with open("schema.sql", "r", encoding="utf-8") as f:
+            conn.execute(f.read())
+        conn.commit()
