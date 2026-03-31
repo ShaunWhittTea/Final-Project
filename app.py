@@ -1,8 +1,9 @@
 from flask import Flask, request, jsonify
-from db import get_db
+from db import get_db, init_db
 import os
 
 app = Flask(__name__)
+init_db()
 
 TEST_PASSWORD = os.environ.get("TEST_PASSWORD", "clemson-test-2026")
 
