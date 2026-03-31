@@ -53,7 +53,7 @@ def is_valid_int_id(value):
 def get_player_row(cur, player_id):
     cur.execute(
         """
-        SELECT player_id, display_name, created_at, total_games, total_wins, total_losses, total_moves
+        SELECT player_id, username, created_at, total_games, total_wins, total_losses, total_moves
         FROM players
         WHERE player_id = %s
         """,
@@ -89,7 +89,7 @@ def count_players_in_game(cur, game_id):
 def get_turn_order_rows(cur, game_id):
     cur.execute(
         """
-        SELECT gp.player_id, gp.turn_order, p.display_name
+        SELECT gp.player_id, gp.turn_order, p.username
         FROM game_players gp
         JOIN players p ON p.player_id = gp.player_id
         WHERE gp.game_id = %s
@@ -385,7 +385,7 @@ def create_player():
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO players (display_name)
+                    INSERT INTO players (username)
                     VALUES (%s)
                     RETURNING player_id
                     """,
