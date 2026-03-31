@@ -3,7 +3,7 @@ from db import get_db
 
 app = Flask(__name__)
 
-TEST_PASSWORD = "clemson-test-2026"
+TEST_PASSWORD = os.environ.get("TEST_PASSWORD", "clemson-test-2026")
 
 def check_test_auth():
     return request.headers.get("X-Test-Password") == TEST_PASSWORD
