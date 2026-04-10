@@ -14,8 +14,8 @@ TEST_MODE = os.getenv("TEST_MODE", "true").lower() == "true"
 TEST_PASSWORD = os.getenv("TEST_PASSWORD", "clemson-test-2026")
 AUTO_RESET_ON_START = os.getenv("AUTO_RESET_ON_START", "true").lower() == "true"
 
-API_VERSION = "2.8.0"
-SPEC_VERSION = "2.8"
+API_VERSION = "2.8.1"
+SPEC_VERSION = "2.8.1"
 APP_START_TIME = time.time()
 
 MIN_GRID_SIZE = 5
@@ -865,12 +865,12 @@ def place_production_ships(game_id):
                 if not membership:
                     return error_response("forbidden", "Player not in game", 403)
 
-                if player_has_placed(cur, game_id, player_id):
-                    return error_response("conflict", "Ships already placed", 409)
-
                 normalized = normalize_ship_cells(ships, game["grid_size"])
                 if normalized is None:
                     return error_response("bad_request", "Exactly 3 valid ships are required", 400)
+
+                if player_has_placed(cur, game_id, player_id):
+                    return error_response("conflict", "Ships already placed", 409)
 
                 for row, col in normalized:
                     cur.execute(
@@ -926,21 +926,12 @@ def fire(game_id):
                 if not game:
                     return error_response("not_found", "Game does not exist", 404)
 
-                if game["status"] == FINISHED_STATUS:
-                    return error_response("bad_request", "Game already finished", 400)
-
-                if game["status"] != PLAYING_STATUS:
-                    return error_response("forbidden", "Game is not in playing state", 403)
-
                 if not get_player_row(cur, player_id):
                     return error_response("not_found", "Player does not exist", 404)
 
                 membership = player_in_game(cur, game_id, player_id)
                 if not membership:
                     return error_response("forbidden", "Player not in game", 403)
-
-                if membership["turn_order"] != game["current_turn_index"]:
-                    return error_response("forbidden", "Not your turn", 403)
 
                 if row < 0 or row >= game["grid_size"] or col < 0 or col >= game["grid_size"]:
                     return error_response("bad_request", "Shot out of bounds", 400)
@@ -956,6 +947,15 @@ def fire(game_id):
                 )
                 if cur.fetchone():
                     return error_response("conflict", "Cell already fired upon", 409)
+
+                if game["status"] == FINISHED_STATUS:
+                    return error_response("bad_request", "Game already finished", 400)
+
+                if game["status"] != PLAYING_STATUS:
+                    return error_response("forbidden", "Game is not in playing state", 403)
+
+                if membership["turn_order"] != game["current_turn_index"]:
+                    return error_response("forbidden", "Not your turn", 403)
 
                 target_player_id = None
                 result = "miss"
