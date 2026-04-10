@@ -17,6 +17,7 @@ AUTO_RESET_ON_START = os.getenv("AUTO_RESET_ON_START", "true").lower() == "true"
 API_VERSION = "2.8.1"
 SPEC_VERSION = "2.8.1"
 APP_START_TIME = time.time()
+INITIAL_RESET_DONE = False
 
 MIN_GRID_SIZE = 5
 MAX_GRID_SIZE = 15
@@ -486,6 +487,19 @@ except Exception as ex:
     print(f"DB init/startup reset failed: {ex}")
 
 
+@app.before_request
+def ensure_clean_test_state_once():
+    global INITIAL_RESET_DONE
+    if TEST_MODE and AUTO_RESET_ON_START and not INITIAL_RESET_DONE:
+        try:
+            reset_database()
+            INITIAL_RESET_DONE = True
+            print("Lazy auto reset before first request completed.")
+        except Exception as ex:
+            print(f"Lazy auto reset failed: {ex}")
+
+
+
 @app.get("/api/")
 def api_metadata():
     return jsonify({
@@ -678,13 +692,23 @@ def create_game():
             except Exception as ex:
                 print(f"Auto-create player1 error: {ex}")
 
+    used_player_name_shortcut = creator_id is None and "player1" in data
+
     if grid_size is None:
-        grid_size = data.get("gridSize", DEFAULT_GRID_SIZE)
+        grid_size = data.get("gridSize")
     if max_players is None:
-        max_players = data.get("maxPlayers", DEFAULT_MAX_PLAYERS)
+        max_players = data.get("maxPlayers")
+
+    if used_player_name_shortcut:
+        if grid_size is None:
+            grid_size = DEFAULT_GRID_SIZE
+        if max_players is None:
+            max_players = DEFAULT_MAX_PLAYERS
 
     if not is_valid_int_id(creator_id):
         return error_response("bad_request", "creator_id is required", 400)
+    if grid_size is None or max_players is None:
+        return error_response("bad_request", "missing required fields", 400)
     if not isinstance(grid_size, int) or not (MIN_GRID_SIZE <= grid_size <= MAX_GRID_SIZE):
         return error_response("bad_request", "grid_size must be between 5 and 15", 400)
     if not isinstance(max_players, int) or not (MIN_PLAYERS <= max_players <= MAX_PLAYERS):
@@ -785,19 +809,6 @@ def join_game(game_id):
 
                 existing = player_in_game(cur, game_id, player_id)
                 if existing:
-                    player_count = count_players_in_game(cur, game_id)
-                    creator_setup_retry = (
-                        existing["turn_order"] == 0
-                        and player_count == 1
-                        and game["status"] == WAITING_STATUS
-                        and not any_ships_in_game(cur, game_id)
-                    )
-                    if creator_setup_retry:
-                        return jsonify({
-                            "status": "joined",
-                            "game_id": game_id,
-                            "player_id": player_id,
-                        }), 200
                     return error_response("conflict", "Player already joined this game", 409)
 
                 if game["status"] != WAITING_STATUS:
