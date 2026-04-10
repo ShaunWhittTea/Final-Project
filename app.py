@@ -785,6 +785,19 @@ def join_game(game_id):
 
                 existing = player_in_game(cur, game_id, player_id)
                 if existing:
+                    player_count = count_players_in_game(cur, game_id)
+                    creator_setup_retry = (
+                        existing["turn_order"] == 0
+                        and player_count == 1
+                        and game["status"] == WAITING_STATUS
+                        and not any_ships_in_game(cur, game_id)
+                    )
+                    if creator_setup_retry:
+                        return jsonify({
+                            "status": "joined",
+                            "game_id": game_id,
+                            "player_id": player_id,
+                        }), 200
                     return error_response("conflict", "Player already joined this game", 409)
 
                 if game["status"] != WAITING_STATUS:
