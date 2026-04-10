@@ -14,8 +14,8 @@ TEST_MODE = os.getenv("TEST_MODE", "true").lower() == "true"
 TEST_PASSWORD = os.getenv("TEST_PASSWORD", "clemson-test-2026")
 AUTO_RESET_ON_START = os.getenv("AUTO_RESET_ON_START", "true").lower() == "true"
 
-API_VERSION = "2.5.0"
-SPEC_VERSION = "2.5"
+API_VERSION = "2.6.0"
+SPEC_VERSION = "2.6"
 APP_START_TIME = time.time()
 
 MIN_GRID_SIZE = 5
@@ -427,7 +427,6 @@ def compute_sunk_for_player(cur, game_id, player_id):
 def build_board_view(cur, game_id, player_id, grid_size):
     ship_cells = set()
     hit_cells = set()
-    miss_cells = set()
 
     cur.execute(
         """
@@ -450,17 +449,6 @@ def build_board_view(cur, game_id, player_id, grid_size):
     )
     for row in cur.fetchall():
         hit_cells.add((row["row_index"], row["col_index"]))
-
-    cur.execute(
-        """
-        SELECT row_index, col_index
-        FROM shots
-        WHERE game_id = %s AND target_player_id = %s AND result = 'miss'
-        """,
-        (game_id, player_id)
-    )
-    for row in cur.fetchall():
-        miss_cells.add((row["row_index"], row["col_index"]))
 
     board_rows = []
     for r in range(grid_size):
@@ -525,26 +513,46 @@ def create_player():
     data = parse_json()
 
     if "player_id" in data or "playerId" in data:
-        return error_response("bad_request", "Client may not supply player_id", 400)
+        return jsonify({
+            "error": "Client may not supply player_id",
+            "message": "Client may not supply player_id"
+        }), 400
 
     username = data.get("username")
     if username is None:
         username = data.get("playerName")
 
     if username is None:
-        return error_response("bad_request", "Missing required field: username", 400)
+        return jsonify({
+            "error": "Missing required field: username",
+            "message": "Missing required field: username"
+        }), 400
 
     if not isinstance(username, str) or not username.strip():
-        return error_response("bad_request", "username required", 400)
+        return jsonify({
+            "error": "username required",
+            "message": "username required"
+        }), 400
 
     username = username.strip()
 
     if len(username) > 30 or not username.replace("_", "a").isalnum():
-        return error_response("bad_request", "Username must be alphanumeric with underscores only", 400)
+        return jsonify({
+            "error": "Username must be alphanumeric with underscores only",
+            "message": "Username must be alphanumeric with underscores only"
+        }), 400
 
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
+                existing = get_player_row_by_username(cur, username)
+                if existing:
+                    return jsonify({
+                        "player_id": existing["player_id"],
+                        "username": existing["username"],
+                        "displayName": existing["username"],
+                    }), 200
+
                 cur.execute(
                     """
                     INSERT INTO players (username)
@@ -568,16 +576,17 @@ def create_player():
                     existing = get_player_row_by_username(cur, username)
             if existing:
                 return jsonify({
-                    "error": "conflict",
-                    "message": "Username already exists",
                     "player_id": existing["player_id"],
                     "username": existing["username"],
                     "displayName": existing["username"],
-                }), 409
+                }), 200
         except Exception as inner_ex:
             print(f"Duplicate username lookup error: {inner_ex}")
 
-        return error_response("conflict", "Username already exists", 409)
+        return jsonify({
+            "error": "Username already taken",
+            "message": "Username already taken"
+        }), 409
     except Exception as ex:
         print(f"Create player error: {ex}")
         return error_response("internal_error", "Failed to create player", 500)
