@@ -79,7 +79,15 @@ CREATE TABLE IF NOT EXISTS shots (
     CONSTRAINT fk_shot_target
         FOREIGN KEY (target_player_id)
         REFERENCES players(player_id)
-        ON DELETE CASCADE,
-    CONSTRAINT unique_shot_per_target_cell
-        UNIQUE (game_id, target_player_id, row_index, col_index)
+        ON DELETE CASCADE
 );
+
+ALTER TABLE shots
+    DROP CONSTRAINT IF EXISTS unique_shot_per_target_cell;
+
+ALTER TABLE shots
+    DROP CONSTRAINT IF EXISTS unique_shot_per_game_cell;
+
+ALTER TABLE shots
+    ADD CONSTRAINT unique_shot_per_game_cell
+        UNIQUE (game_id, row_index, col_index);
