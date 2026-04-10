@@ -1,4 +1,4 @@
-import json
+iimport json
 import os
 import time
 from flask import Flask, jsonify, request
@@ -12,8 +12,10 @@ load_dotenv()
 
 TEST_MODE = os.getenv("TEST_MODE", "true").lower() == "true"
 TEST_PASSWORD = os.getenv("TEST_PASSWORD", "clemson-test-2026")
-API_VERSION = "2.4.0"
-SPEC_VERSION = "2.4"
+AUTO_RESET_ON_START = os.getenv("AUTO_RESET_ON_START", "true").lower() == "true"
+
+API_VERSION = "2.5.0"
+SPEC_VERSION = "2.5"
 APP_START_TIME = time.time()
 
 MIN_GRID_SIZE = 5
@@ -33,11 +35,6 @@ PLACEHOLDER_PLAYER_IDS = {":player_id", "{player_id}"}
 
 app = Flask(__name__)
 CORS(app)
-
-try:
-    init_db()
-except Exception as ex:
-    print(f"DB init failed: {ex}")
 
 
 def error_response(error: str, message: str, status: int = 400):
@@ -79,6 +76,13 @@ def resolve_player_id(player_id):
         if player_id in PLACEHOLDER_PLAYER_IDS:
             return 1
     return None
+
+
+def reset_database():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE shots, ships, game_players, games, players RESTART IDENTITY CASCADE")
+            conn.commit()
 
 
 def get_player_row(cur, player_id):
@@ -466,13 +470,20 @@ def build_board_view(cur, game_id, player_id, grid_size):
                 rendered.append("X")
             elif (r, c) in ship_cells:
                 rendered.append("O")
-            elif (r, c) in miss_cells:
-                rendered.append("~")
             else:
                 rendered.append("~")
         board_rows.append(" ".join(rendered))
 
     return board_rows
+
+
+try:
+    init_db()
+    if TEST_MODE and AUTO_RESET_ON_START:
+        reset_database()
+        print("Auto reset on startup completed.")
+except Exception as ex:
+    print(f"DB init/startup reset failed: {ex}")
 
 
 @app.get("/api/")
@@ -502,10 +513,7 @@ def health():
 @app.post("/api/reset")
 def system_reset():
     try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("TRUNCATE TABLE shots, ships, game_players, games, players RESTART IDENTITY CASCADE")
-                conn.commit()
+        reset_database()
         return jsonify({"status": "reset"}), 200
     except Exception as ex:
         print(f"System reset error: {ex}")
