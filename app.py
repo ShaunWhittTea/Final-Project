@@ -14,8 +14,8 @@ TEST_MODE = os.getenv("TEST_MODE", "true").lower() == "true"
 TEST_PASSWORD = os.getenv("TEST_PASSWORD", "clemson-test-2026")
 AUTO_RESET_ON_START = os.getenv("AUTO_RESET_ON_START", "true").lower() == "true"
 
-API_VERSION = "2.9.0"
-SPEC_VERSION = "2.9"
+API_VERSION = "2.8.0"
+SPEC_VERSION = "2.8"
 APP_START_TIME = time.time()
 
 MIN_GRID_SIZE = 5
@@ -477,36 +477,6 @@ def build_board_view(cur, game_id, player_id, grid_size):
     return board_rows
 
 
-def state_counts(cur):
-    cur.execute("SELECT COUNT(*) AS count FROM players")
-    player_count = cur.fetchone()["count"]
-
-    cur.execute("SELECT COUNT(*) AS count FROM games")
-    game_count = cur.fetchone()["count"]
-
-    cur.execute("SELECT COUNT(*) AS count FROM shots")
-    shot_count = cur.fetchone()["count"]
-
-    return player_count, game_count, shot_count
-
-
-def maybe_soft_reset_for_new_test(cur, username: str):
-    if not TEST_MODE:
-        return False
-
-    if not isinstance(username, str) or not username.strip():
-        return False
-
-    player_count, game_count, shot_count = state_counts(cur)
-
-    polluted = shot_count > 0 or game_count >= 4 or player_count >= 8
-    if not polluted:
-        return False
-
-    cur.execute("TRUNCATE TABLE shots, ships, game_players, games, players RESTART IDENTITY CASCADE")
-    return True
-
-
 try:
     init_db()
     if TEST_MODE and AUTO_RESET_ON_START:
@@ -587,10 +557,6 @@ def create_player():
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
-                did_reset = maybe_soft_reset_for_new_test(cur, username)
-                if did_reset:
-                    conn.commit()
-
                 existing = get_player_row_by_username(cur, username)
                 if existing:
                     return jsonify({
