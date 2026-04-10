@@ -786,7 +786,6 @@ def get_game(game_id):
 @app.post("/api/games/<int:game_id>/join")
 @app.post("/api/games/<game_id>/join")
 def join_game(game_id):
-    raw_game_id = game_id
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
         return error_response("bad_request", "game_id is required", 400)
@@ -814,10 +813,8 @@ def join_game(game_id):
                 existing = player_in_game(cur, game_id, player_id)
                 if existing:
                     player_count = count_players_in_game(cur, game_id)
-                    used_placeholder_game_id = isinstance(raw_game_id, str) and raw_game_id in PLACEHOLDER_GAME_IDS
                     creator_setup_retry = (
-                        used_placeholder_game_id
-                        and existing["turn_order"] == 0
+                        existing["turn_order"] == 0
                         and player_count == 1
                         and game["status"] == WAITING_STATUS
                         and not any_ships_in_game(cur, game_id)
