@@ -14,8 +14,8 @@ TEST_MODE = os.getenv("TEST_MODE", "true").lower() == "true"
 TEST_PASSWORD = os.getenv("TEST_PASSWORD", "clemson-test-2026")
 AUTO_RESET_ON_START = os.getenv("AUTO_RESET_ON_START", "true").lower() == "true"
 
-API_VERSION = "2.6.0"
-SPEC_VERSION = "2.6"
+API_VERSION = "2.7.0"
+SPEC_VERSION = "2.7"
 APP_START_TIME = time.time()
 
 MIN_GRID_SIZE = 5
@@ -771,12 +771,18 @@ def join_game(game_id):
                 if not player:
                     return error_response("not_found", "Player does not exist", 404)
 
-                if game["status"] != WAITING_STATUS:
-                    return error_response("conflict", "Game already started", 409)
-
                 existing = player_in_game(cur, game_id, player_id)
                 if existing:
+                    if existing["turn_order"] == 0:
+                        return jsonify({
+                            "status": "joined",
+                            "game_id": game_id,
+                            "player_id": player_id,
+                        }), 200
                     return error_response("conflict", "Player already joined this game", 409)
+
+                if game["status"] != WAITING_STATUS:
+                    return error_response("conflict", "Game already started", 409)
 
                 player_count = count_players_in_game(cur, game_id)
                 if player_count >= game["max_players"]:
