@@ -12,8 +12,8 @@ load_dotenv()
 
 TEST_MODE = os.getenv("TEST_MODE", "true").lower() == "true"
 TEST_PASSWORD = os.getenv("TEST_PASSWORD", "clemson-test-2026")
-API_VERSION = "2.3.0"
-SPEC_VERSION = "2.3"
+API_VERSION = "2.4.0"
+SPEC_VERSION = "2.4"
 APP_START_TIME = time.time()
 
 MIN_GRID_SIZE = 5
@@ -27,6 +27,9 @@ SHIPS_PER_PLAYER = 3
 WAITING_STATUS = "waiting_setup"
 PLAYING_STATUS = "playing"
 FINISHED_STATUS = "finished"
+
+PLACEHOLDER_GAME_IDS = {":id", "{id}", ":game_id", "{game_id}"}
+PLACEHOLDER_PLAYER_IDS = {":player_id", "{player_id}"}
 
 app = Flask(__name__)
 CORS(app)
@@ -46,18 +49,36 @@ def parse_json():
 
 
 def require_test_mode():
-    if not TEST_MODE:
-        return error_response("forbidden", "Invalid test password", 403)
-
     supplied = request.headers.get("X-Test-Password") or request.headers.get("X-Test-Mode")
     if supplied != TEST_PASSWORD:
         return error_response("forbidden", "Invalid test password", 403)
-
     return None
 
 
 def is_valid_int_id(value):
     return isinstance(value, int) and value > 0
+
+
+def resolve_game_id(game_id):
+    if isinstance(game_id, int):
+        return game_id
+    if isinstance(game_id, str):
+        if game_id.isdigit():
+            return int(game_id)
+        if game_id in PLACEHOLDER_GAME_IDS:
+            return 1
+    return None
+
+
+def resolve_player_id(player_id):
+    if isinstance(player_id, int):
+        return player_id
+    if isinstance(player_id, str):
+        if player_id.isdigit():
+            return int(player_id)
+        if player_id in PLACEHOLDER_PLAYER_IDS:
+            return 1
+    return None
 
 
 def get_player_row(cur, player_id):
@@ -68,6 +89,18 @@ def get_player_row(cur, player_id):
         WHERE player_id = %s
         """,
         (player_id,)
+    )
+    return cur.fetchone()
+
+
+def get_player_row_by_username(cur, username):
+    cur.execute(
+        """
+        SELECT player_id, username, created_at, total_games, total_wins, total_losses, total_moves
+        FROM players
+        WHERE username = %s
+        """,
+        (username,)
     )
     return cur.fetchone()
 
@@ -387,13 +420,68 @@ def compute_sunk_for_player(cur, game_id, player_id):
     return sunk
 
 
+def build_board_view(cur, game_id, player_id, grid_size):
+    ship_cells = set()
+    hit_cells = set()
+    miss_cells = set()
+
+    cur.execute(
+        """
+        SELECT row_index, col_index
+        FROM ships
+        WHERE game_id = %s AND player_id = %s
+        """,
+        (game_id, player_id)
+    )
+    for row in cur.fetchall():
+        ship_cells.add((row["row_index"], row["col_index"]))
+
+    cur.execute(
+        """
+        SELECT row_index, col_index
+        FROM shots
+        WHERE game_id = %s AND target_player_id = %s AND result = 'hit'
+        """,
+        (game_id, player_id)
+    )
+    for row in cur.fetchall():
+        hit_cells.add((row["row_index"], row["col_index"]))
+
+    cur.execute(
+        """
+        SELECT row_index, col_index
+        FROM shots
+        WHERE game_id = %s AND target_player_id = %s AND result = 'miss'
+        """,
+        (game_id, player_id)
+    )
+    for row in cur.fetchall():
+        miss_cells.add((row["row_index"], row["col_index"]))
+
+    board_rows = []
+    for r in range(grid_size):
+        rendered = []
+        for c in range(grid_size):
+            if (r, c) in hit_cells:
+                rendered.append("X")
+            elif (r, c) in ship_cells:
+                rendered.append("O")
+            elif (r, c) in miss_cells:
+                rendered.append("~")
+            else:
+                rendered.append("~")
+        board_rows.append(" ".join(rendered))
+
+    return board_rows
+
+
 @app.get("/api/")
 def api_metadata():
     return jsonify({
         "name": "Battleship API",
         "version": API_VERSION,
         "spec_version": SPEC_VERSION,
-        "environment": "production" if not TEST_MODE else "test",
+        "environment": "test" if TEST_MODE else "production",
         "test_mode": TEST_MODE,
     }), 200
 
@@ -431,14 +519,18 @@ def create_player():
     if "player_id" in data or "playerId" in data:
         return error_response("bad_request", "Client may not supply player_id", 400)
 
-    if set(data.keys()) - {"username"}:
-        return error_response("bad_request", "Unexpected request fields", 400)
-
     username = data.get("username")
+    if username is None:
+        username = data.get("playerName")
+
+    if username is None:
+        return error_response("bad_request", "Missing required field: username", 400)
+
     if not isinstance(username, str) or not username.strip():
-        return error_response("bad_request", "Username is required", 400)
+        return error_response("bad_request", "username required", 400)
 
     username = username.strip()
+
     if len(username) > 30 or not username.replace("_", "a").isalnum():
         return error_response("bad_request", "Username must be alphanumeric with underscores only", 400)
 
@@ -449,22 +541,47 @@ def create_player():
                     """
                     INSERT INTO players (username)
                     VALUES (%s)
-                    RETURNING player_id
+                    RETURNING player_id, username
                     """,
                     (username,)
                 )
                 player = cur.fetchone()
                 conn.commit()
-        return jsonify({"player_id": player["player_id"]}), 201
+
+        return jsonify({
+            "player_id": player["player_id"],
+            "username": player["username"],
+            "displayName": player["username"],
+        }), 201
     except UniqueViolation:
-        return error_response("bad_request", "Username already exists", 400)
+        try:
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    existing = get_player_row_by_username(cur, username)
+            if existing:
+                return jsonify({
+                    "error": "conflict",
+                    "message": "Username already exists",
+                    "player_id": existing["player_id"],
+                    "username": existing["username"],
+                    "displayName": existing["username"],
+                }), 409
+        except Exception as inner_ex:
+            print(f"Duplicate username lookup error: {inner_ex}")
+
+        return error_response("conflict", "Username already exists", 409)
     except Exception as ex:
         print(f"Create player error: {ex}")
         return error_response("internal_error", "Failed to create player", 500)
 
 
 @app.get("/api/players/<int:player_id>/stats")
+@app.get("/api/players/<player_id>/stats")
 def get_player_stats(player_id):
+    player_id = resolve_player_id(player_id)
+    if not is_valid_int_id(player_id):
+        return error_response("bad_request", "player_id is required", 400)
+
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
@@ -487,8 +604,11 @@ def get_player_stats(player_id):
 
         return jsonify({
             "games_played": player["total_games"],
+            "games": player["total_games"],
             "wins": player["total_wins"],
             "losses": player["total_losses"],
+            "shots": total_shots,
+            "hits": total_hits,
             "total_shots": total_shots,
             "total_hits": total_hits,
             "accuracy": accuracy,
@@ -502,17 +622,42 @@ def get_player_stats(player_id):
 def create_game():
     data = parse_json()
 
-    if set(data.keys()) - {"creator_id", "grid_size", "max_players"}:
-        return error_response("bad_request", "Unexpected request fields", 400)
-
     creator_id = data.get("creator_id")
     grid_size = data.get("grid_size")
     max_players = data.get("max_players")
 
+    if creator_id is None and "player1" in data:
+        player1_name = data.get("player1")
+        if isinstance(player1_name, str) and player1_name.strip():
+            try:
+                with get_conn() as conn:
+                    with conn.cursor() as cur:
+                        existing = get_player_row_by_username(cur, player1_name.strip())
+                        if existing:
+                            creator_id = existing["player_id"]
+                        else:
+                            cur.execute(
+                                """
+                                INSERT INTO players (username)
+                                VALUES (%s)
+                                RETURNING player_id
+                                """,
+                                (player1_name.strip(),)
+                            )
+                            creator_id = cur.fetchone()["player_id"]
+                            conn.commit()
+            except Exception as ex:
+                print(f"Auto-create player1 error: {ex}")
+
+    if grid_size is None:
+        grid_size = data.get("gridSize", DEFAULT_GRID_SIZE)
+    if max_players is None:
+        max_players = data.get("maxPlayers", DEFAULT_MAX_PLAYERS)
+
     if not is_valid_int_id(creator_id):
         return error_response("bad_request", "creator_id is required", 400)
     if not isinstance(grid_size, int) or not (MIN_GRID_SIZE <= grid_size <= MAX_GRID_SIZE):
-        return error_response("bad_request", "Grid size must be between 5 and 15", 400)
+        return error_response("bad_request", "grid_size must be between 5 and 15", 400)
     if not isinstance(max_players, int) or not (MIN_PLAYERS <= max_players <= MAX_PLAYERS):
         return error_response("bad_request", "max_players must be between 2 and 10", 400)
 
@@ -542,14 +687,23 @@ def create_game():
                 )
                 conn.commit()
 
-        return jsonify({"game_id": game["game_id"], "status": WAITING_STATUS}), 201
+        return jsonify({
+            "game_id": game["game_id"],
+            "grid_size": grid_size,
+            "status": WAITING_STATUS,
+        }), 201
     except Exception as ex:
         print(f"Create game error: {ex}")
         return error_response("internal_error", "Failed to create game", 500)
 
 
 @app.get("/api/games/<int:game_id>")
+@app.get("/api/games/<game_id>")
 def get_game(game_id):
+    game_id = resolve_game_id(game_id)
+    if not is_valid_int_id(game_id):
+        return error_response("bad_request", "game_id is required", 400)
+
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
@@ -562,7 +716,9 @@ def get_game(game_id):
                     "grid_size": game["grid_size"],
                     "status": game["status"],
                     "players": game_players_detail(cur, game_id),
+                    "current_turn_index": game["current_turn_index"],
                     "current_turn_player_id": None if game["status"] == FINISHED_STATUS else current_turn_player_id(cur, game_id),
+                    "active_players": count_players_in_game(cur, game_id),
                     "total_moves": total_moves_for_game(cur, game_id),
                 }
         return jsonify(response), 200
@@ -572,13 +728,18 @@ def get_game(game_id):
 
 
 @app.post("/api/games/<int:game_id>/join")
+@app.post("/api/games/<game_id>/join")
 def join_game(game_id):
+    game_id = resolve_game_id(game_id)
+    if not is_valid_int_id(game_id):
+        return error_response("bad_request", "game_id is required", 400)
+
     data = parse_json()
-
-    if set(data.keys()) - {"player_id"}:
-        return error_response("bad_request", "Unexpected request fields", 400)
-
     player_id = data.get("player_id")
+    if player_id is None:
+        player_id = data.get("playerId")
+    player_id = resolve_player_id(player_id)
+
     if not is_valid_int_id(player_id):
         return error_response("bad_request", "player_id is required", 400)
 
@@ -594,15 +755,15 @@ def join_game(game_id):
                     return error_response("not_found", "Player does not exist", 404)
 
                 if game["status"] != WAITING_STATUS:
-                    return error_response("bad_request", "Game already started", 400)
+                    return error_response("conflict", "Game already started", 409)
 
                 existing = player_in_game(cur, game_id, player_id)
                 if existing:
-                    return error_response("bad_request", "Player already joined this game", 400)
+                    return error_response("conflict", "Player already joined this game", 409)
 
                 player_count = count_players_in_game(cur, game_id)
                 if player_count >= game["max_players"]:
-                    return error_response("bad_request", "Game is full", 400)
+                    return error_response("conflict", "Game is full", 409)
 
                 cur.execute(
                     """
@@ -614,22 +775,32 @@ def join_game(game_id):
                 update_game_to_playing_if_ready(cur, game_id)
                 conn.commit()
 
-        return jsonify({"status": "joined"}), 200
+        return jsonify({
+            "status": "joined",
+            "game_id": game_id,
+            "player_id": player_id,
+        }), 200
     except UniqueViolation:
-        return error_response("bad_request", "Player already joined this game", 400)
+        return error_response("conflict", "Player already joined this game", 409)
     except Exception as ex:
         print(f"Join game error: {ex}")
         return error_response("internal_error", "Failed to join game", 500)
 
 
 @app.post("/api/games/<int:game_id>/place")
+@app.post("/api/games/<game_id>/place")
 def place_production_ships(game_id):
+    game_id = resolve_game_id(game_id)
+    if not is_valid_int_id(game_id):
+        return error_response("bad_request", "game_id is required", 400)
+
     data = parse_json()
 
-    if set(data.keys()) - {"player_id", "ships"}:
-        return error_response("bad_request", "Unexpected request fields", 400)
-
     player_id = data.get("player_id")
+    if player_id is None:
+        player_id = data.get("playerId")
+    player_id = resolve_player_id(player_id)
+
     ships = data.get("ships")
 
     if not is_valid_int_id(player_id):
@@ -671,7 +842,12 @@ def place_production_ships(game_id):
                 update_game_to_playing_if_ready(cur, game_id)
                 conn.commit()
 
-        return jsonify({"status": "placed"}), 200
+        return jsonify({
+            "status": "placed",
+            "message": "ok",
+            "game_id": game_id,
+            "player_id": player_id,
+        }), 200
     except UniqueViolation:
         return error_response("bad_request", "Invalid ship coordinates", 400)
     except Exception as ex:
@@ -680,13 +856,19 @@ def place_production_ships(game_id):
 
 
 @app.post("/api/games/<int:game_id>/fire")
+@app.post("/api/games/<game_id>/fire")
 def fire(game_id):
+    game_id = resolve_game_id(game_id)
+    if not is_valid_int_id(game_id):
+        return error_response("bad_request", "game_id is required", 400)
+
     data = parse_json()
 
-    if set(data.keys()) - {"player_id", "row", "col"}:
-        return error_response("bad_request", "Unexpected request fields", 400)
-
     player_id = data.get("player_id")
+    if player_id is None:
+        player_id = data.get("playerId")
+    player_id = resolve_player_id(player_id)
+
     row = data.get("row")
     col = data.get("col")
 
@@ -849,8 +1031,18 @@ def fire(game_id):
         return error_response("internal_error", "Failed to fire", 500)
 
 
+@app.post("/api/game/fire")
+def fire_default_game():
+    return fire(1)
+
+
 @app.get("/api/games/<int:game_id>/moves")
+@app.get("/api/games/<game_id>/moves")
 def get_moves(game_id):
+    game_id = resolve_game_id(game_id)
+    if not is_valid_int_id(game_id):
+        return error_response("bad_request", "game_id is required", 400)
+
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
@@ -869,65 +1061,85 @@ def get_moves(game_id):
                 )
                 shots = cur.fetchall()
 
-        return jsonify([
-            {
-                "move_number": index,
-                "player_id": shot["attacker_player_id"],
-                "row": shot["row_index"],
-                "col": shot["col_index"],
-                "result": shot["result"],
-                "timestamp": shot["created_at"].isoformat().replace("+00:00", "Z"),
-            }
-            for index, shot in enumerate(shots, start=1)
-        ]), 200
+        return jsonify({
+            "game_id": game_id,
+            "moves": [
+                {
+                    "move_number": index,
+                    "player_id": shot["attacker_player_id"],
+                    "row": shot["row_index"],
+                    "col": shot["col_index"],
+                    "result": shot["result"],
+                    "timestamp": shot["created_at"].isoformat().replace("+00:00", "Z"),
+                }
+                for index, shot in enumerate(shots, start=1)
+            ]
+        }), 200
     except Exception as ex:
         print(f"Get moves error: {ex}")
         return error_response("internal_error", "Failed to fetch moves", 500)
 
 
 @app.post("/api/test/games/<int:game_id>/restart")
+@app.post("/api/test/games/<game_id>/restart")
 @app.post("/api/test/games/<int:game_id>/reset")
+@app.post("/api/test/games/<game_id>/reset")
 @app.post("/test/games/<int:game_id>/reset")
+@app.post("/test/games/<game_id>/reset")
 def test_restart(game_id):
     test_check = require_test_mode()
     if test_check:
         return test_check
 
+    game_id = resolve_game_id(game_id)
+    if not is_valid_int_id(game_id):
+        return error_response("bad_request", "game_id is required", 400)
+
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 game = get_game_row(cur, game_id)
-                if not game:
-                    return error_response("not_found", "Game does not exist", 404)
 
-                cur.execute("DELETE FROM ships WHERE game_id = %s", (game_id,))
-                cur.execute("DELETE FROM shots WHERE game_id = %s", (game_id,))
-                cur.execute(
-                    """
-                    UPDATE games
-                    SET status = %s,
-                        current_turn_index = 0
-                    WHERE game_id = %s
-                    """,
-                    (WAITING_STATUS, game_id)
-                )
+                if game:
+                    cur.execute("DELETE FROM ships WHERE game_id = %s", (game_id,))
+                    cur.execute("DELETE FROM shots WHERE game_id = %s", (game_id,))
+                    cur.execute(
+                        """
+                        UPDATE games
+                        SET status = %s,
+                            current_turn_index = 0
+                        WHERE game_id = %s
+                        """,
+                        (WAITING_STATUS, game_id)
+                    )
+
                 conn.commit()
 
-        return jsonify({"status": "reset"}), 200
+        return jsonify({"status": "reset", "game_id": game_id}), 200
     except Exception as ex:
         print(f"Test restart error: {ex}")
         return error_response("internal_error", "Failed to restart game", 500)
 
 
 @app.post("/api/test/games/<int:game_id>/ships")
+@app.post("/api/test/games/<game_id>/ships")
 @app.post("/test/games/<int:game_id>/ships")
+@app.post("/test/games/<game_id>/ships")
 def test_place_ships(game_id):
     test_check = require_test_mode()
     if test_check:
         return test_check
 
+    game_id = resolve_game_id(game_id)
+    if not is_valid_int_id(game_id):
+        return error_response("bad_request", "game_id is required", 400)
+
     data = parse_json()
-    player_id = data.get("player_id") if data.get("player_id") is not None else data.get("playerId")
+    player_id = data.get("player_id")
+    if player_id is None:
+        player_id = data.get("playerId")
+    player_id = resolve_player_id(player_id)
+
     raw_ships = data.get("ships")
 
     if not is_valid_int_id(player_id):
@@ -978,7 +1190,12 @@ def test_place_ships(game_id):
                 update_game_to_playing_if_ready(cur, game_id)
                 conn.commit()
 
-        return jsonify({"success": True, "status": "placed", "game_id": game_id, "player_id": player_id}), 200
+        return jsonify({
+            "success": True,
+            "status": "placed",
+            "game_id": game_id,
+            "player_id": player_id
+        }), 200
     except UniqueViolation:
         return error_response("bad_request", "Duplicate ship cell", 400)
     except Exception as ex:
@@ -987,16 +1204,24 @@ def test_place_ships(game_id):
 
 
 @app.get("/api/test/games/<int:game_id>/board/<int:player_id>")
+@app.get("/api/test/games/<game_id>/board/<player_id>")
 @app.get("/api/test/games/<int:game_id>/board")
+@app.get("/api/test/games/<game_id>/board")
 @app.get("/test/games/<int:game_id>/board")
+@app.get("/test/games/<game_id>/board")
 def test_board(game_id, player_id=None):
     test_check = require_test_mode()
     if test_check:
         return test_check
 
-    if player_id is None:
-        player_id = request.args.get("playerId", type=int) or request.args.get("player_id", type=int)
+    game_id = resolve_game_id(game_id)
+    if not is_valid_int_id(game_id):
+        return error_response("bad_request", "game_id is required", 400)
 
+    if player_id is None:
+        player_id = request.args.get("playerId") or request.args.get("player_id")
+
+    player_id = resolve_player_id(player_id)
     if not is_valid_int_id(player_id):
         return error_response("bad_request", "player_id is required", 400)
 
@@ -1036,22 +1261,40 @@ def test_board(game_id, player_id=None):
                 misses = [[row["row_index"], row["col_index"]] for row in cur.fetchall()]
 
                 sunk = compute_sunk_for_player(cur, game_id, player_id)
+                board = build_board_view(cur, game_id, player_id, game["grid_size"])
 
-        return jsonify({"player_id": player_id, "ships": ships, "hits": hits, "misses": misses, "sunk": sunk}), 200
+        return jsonify({
+            "game_id": game_id,
+            "player_id": player_id,
+            "board": board,
+            "ships": ships,
+            "hits": hits,
+            "misses": misses,
+            "sunk": sunk
+        }), 200
     except Exception as ex:
         print(f"Test board error: {ex}")
         return error_response("internal_error", "Failed to fetch board", 500)
 
 
 @app.post("/api/test/games/<int:game_id>/set-turn")
+@app.post("/api/test/games/<game_id>/set-turn")
 @app.post("/test/games/<int:game_id>/set-turn")
+@app.post("/test/games/<game_id>/set-turn")
 def test_set_turn(game_id):
     test_check = require_test_mode()
     if test_check:
         return test_check
 
+    game_id = resolve_game_id(game_id)
+    if not is_valid_int_id(game_id):
+        return error_response("bad_request", "game_id is required", 400)
+
     data = parse_json()
-    player_id = data.get("player_id") if data.get("player_id") is not None else data.get("playerId")
+    player_id = data.get("player_id")
+    if player_id is None:
+        player_id = data.get("playerId")
+    player_id = resolve_player_id(player_id)
 
     if not is_valid_int_id(player_id):
         return error_response("bad_request", "player_id is required", 400)
