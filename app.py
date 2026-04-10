@@ -17,6 +17,7 @@ AUTO_RESET_ON_START = os.getenv("AUTO_RESET_ON_START", "true").lower() == "true"
 API_VERSION = "2.8.1"
 SPEC_VERSION = "2.8.1"
 APP_START_TIME = time.time()
+INITIAL_RESET_DONE = False
 
 MIN_GRID_SIZE = 5
 MAX_GRID_SIZE = 15
@@ -486,6 +487,23 @@ except Exception as ex:
     print(f"DB init/startup reset failed: {ex}")
 
 
+@app.before_request
+def guard_test_routes_and_lazy_reset():
+    global INITIAL_RESET_DONE
+    if TEST_MODE and AUTO_RESET_ON_START and not INITIAL_RESET_DONE:
+        try:
+            reset_database()
+            INITIAL_RESET_DONE = True
+            print("Lazy auto reset before first request completed.")
+        except Exception as ex:
+            print(f"Lazy auto reset failed: {ex}")
+
+    if request.path.startswith("/api/test/") or request.path.startswith("/test/"):
+        test_check = require_test_mode()
+        if test_check:
+            return test_check
+
+
 @app.get("/api/")
 def api_metadata():
     return jsonify({
@@ -654,6 +672,7 @@ def create_game():
     creator_id = data.get("creator_id")
     grid_size = data.get("grid_size")
     max_players = data.get("max_players")
+    used_player_name_shortcut = creator_id is None and "player1" in data
 
     if creator_id is None and "player1" in data:
         player1_name = data.get("player1")
@@ -679,12 +698,20 @@ def create_game():
                 print(f"Auto-create player1 error: {ex}")
 
     if grid_size is None:
-        grid_size = data.get("gridSize", DEFAULT_GRID_SIZE)
+        grid_size = data.get("gridSize")
     if max_players is None:
-        max_players = data.get("maxPlayers", DEFAULT_MAX_PLAYERS)
+        max_players = data.get("maxPlayers")
+
+    if used_player_name_shortcut:
+        if grid_size is None:
+            grid_size = DEFAULT_GRID_SIZE
+        if max_players is None:
+            max_players = DEFAULT_MAX_PLAYERS
 
     if not is_valid_int_id(creator_id):
         return error_response("bad_request", "creator_id is required", 400)
+    if grid_size is None or max_players is None:
+        return error_response("bad_request", "missing required fields", 400)
     if not isinstance(grid_size, int) or not (MIN_GRID_SIZE <= grid_size <= MAX_GRID_SIZE):
         return error_response("bad_request", "grid_size must be between 5 and 15", 400)
     if not isinstance(max_players, int) or not (MIN_PLAYERS <= max_players <= MAX_PLAYERS):
@@ -1129,10 +1156,6 @@ def get_moves(game_id):
 @app.post("/test/games/<int:game_id>/reset")
 @app.post("/test/games/<game_id>/reset")
 def test_restart(game_id):
-    test_check = require_test_mode()
-    if test_check:
-        return test_check
-
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
         return error_response("bad_request", "game_id is required", 400)
@@ -1168,10 +1191,6 @@ def test_restart(game_id):
 @app.post("/test/games/<int:game_id>/ships")
 @app.post("/test/games/<game_id>/ships")
 def test_place_ships(game_id):
-    test_check = require_test_mode()
-    if test_check:
-        return test_check
-
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
         return error_response("bad_request", "game_id is required", 400)
@@ -1252,10 +1271,6 @@ def test_place_ships(game_id):
 @app.get("/test/games/<int:game_id>/board")
 @app.get("/test/games/<game_id>/board")
 def test_board(game_id, player_id=None):
-    test_check = require_test_mode()
-    if test_check:
-        return test_check
-
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
         return error_response("bad_request", "game_id is required", 400)
@@ -1324,10 +1339,6 @@ def test_board(game_id, player_id=None):
 @app.post("/test/games/<int:game_id>/set-turn")
 @app.post("/test/games/<game_id>/set-turn")
 def test_set_turn(game_id):
-    test_check = require_test_mode()
-    if test_check:
-        return test_check
-
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
         return error_response("bad_request", "game_id is required", 400)
