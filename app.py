@@ -27,9 +27,12 @@ DEFAULT_GRID_SIZE = 8
 DEFAULT_MAX_PLAYERS = 2
 SHIPS_PER_PLAYER = 3
 
-WAITING_STATUS = "waiting"
+WAITING_STATUS = "waiting_setup"
 PLAYING_STATUS = "playing"
 FINISHED_STATUS = "finished"
+
+PLACEHOLDER_GAME_IDS = {":id", "{id}", ":game_id", "{game_id}"}
+PLACEHOLDER_PLAYER_IDS = {":player_id", "{player_id}"}
 
 app = Flask(__name__)
 CORS(app)
@@ -57,16 +60,22 @@ def is_valid_int_id(value):
 def resolve_game_id(game_id):
     if isinstance(game_id, int):
         return game_id
-    if isinstance(game_id, str) and game_id.isdigit():
-        return int(game_id)
+    if isinstance(game_id, str):
+        if game_id.isdigit():
+            return int(game_id)
+        if game_id in PLACEHOLDER_GAME_IDS:
+            return 1
     return None
 
 
 def resolve_player_id(player_id):
     if isinstance(player_id, int):
         return player_id
-    if isinstance(player_id, str) and player_id.isdigit():
-        return int(player_id)
+    if isinstance(player_id, str):
+        if player_id.isdigit():
+            return int(player_id)
+        if player_id in PLACEHOLDER_PLAYER_IDS:
+            return 1
     return None
 
 
@@ -481,7 +490,6 @@ except Exception as ex:
 @app.before_request
 def guard_test_routes_and_lazy_reset():
     global INITIAL_RESET_DONE
-
     if TEST_MODE and AUTO_RESET_ON_START and not INITIAL_RESET_DONE:
         try:
             reset_database()
