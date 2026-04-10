@@ -27,12 +27,9 @@ DEFAULT_GRID_SIZE = 8
 DEFAULT_MAX_PLAYERS = 2
 SHIPS_PER_PLAYER = 3
 
-WAITING_STATUS = "waiting_setup"
+WAITING_STATUS = "waiting"
 PLAYING_STATUS = "playing"
 FINISHED_STATUS = "finished"
-
-PLACEHOLDER_GAME_IDS = {":id", "{id}", ":game_id", "{game_id}"}
-PLACEHOLDER_PLAYER_IDS = {":player_id", "{player_id}"}
 
 app = Flask(__name__)
 CORS(app)
@@ -60,22 +57,16 @@ def is_valid_int_id(value):
 def resolve_game_id(game_id):
     if isinstance(game_id, int):
         return game_id
-    if isinstance(game_id, str):
-        if game_id.isdigit():
-            return int(game_id)
-        if game_id in PLACEHOLDER_GAME_IDS:
-            return 1
+    if isinstance(game_id, str) and game_id.isdigit():
+        return int(game_id)
     return None
 
 
 def resolve_player_id(player_id):
     if isinstance(player_id, int):
         return player_id
-    if isinstance(player_id, str):
-        if player_id.isdigit():
-            return int(player_id)
-        if player_id in PLACEHOLDER_PLAYER_IDS:
-            return 1
+    if isinstance(player_id, str) and player_id.isdigit():
+        return int(player_id)
     return None
 
 
@@ -490,6 +481,7 @@ except Exception as ex:
 @app.before_request
 def guard_test_routes_and_lazy_reset():
     global INITIAL_RESET_DONE
+
     if TEST_MODE and AUTO_RESET_ON_START and not INITIAL_RESET_DONE:
         try:
             reset_database()
@@ -963,6 +955,15 @@ def fire(game_id):
                 if row < 0 or row >= game["grid_size"] or col < 0 or col >= game["grid_size"]:
                     return error_response("bad_request", "Shot out of bounds", 400)
 
+                if game["status"] == FINISHED_STATUS:
+                    return error_response("bad_request", "Game already finished", 400)
+
+                if game["status"] != PLAYING_STATUS:
+                    return error_response("forbidden", "Game is not in playing state", 403)
+
+                if membership["turn_order"] != game["current_turn_index"]:
+                    return error_response("forbidden", "Not your turn", 403)
+
                 cur.execute(
                     """
                     SELECT 1
@@ -974,15 +975,6 @@ def fire(game_id):
                 )
                 if cur.fetchone():
                     return error_response("conflict", "Cell already fired upon", 409)
-
-                if game["status"] == FINISHED_STATUS:
-                    return error_response("bad_request", "Game already finished", 400)
-
-                if game["status"] != PLAYING_STATUS:
-                    return error_response("forbidden", "Game is not in playing state", 403)
-
-                if membership["turn_order"] != game["current_turn_index"]:
-                    return error_response("forbidden", "Not your turn", 403)
 
                 target_player_id = None
                 result = "miss"
