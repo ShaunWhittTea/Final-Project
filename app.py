@@ -14,8 +14,8 @@ TEST_MODE = os.getenv("TEST_MODE", "true").lower() == "true"
 TEST_PASSWORD = os.getenv("TEST_PASSWORD", "clemson-test-2026")
 AUTO_RESET_ON_START = os.getenv("AUTO_RESET_ON_START", "true").lower() == "true"
 
-API_VERSION = "2.7.0"
-SPEC_VERSION = "2.7"
+API_VERSION = "2.8.0"
+SPEC_VERSION = "2.8"
 APP_START_TIME = time.time()
 
 MIN_GRID_SIZE = 5
@@ -169,6 +169,18 @@ def player_has_placed(cur, game_id, player_id):
         (game_id, player_id)
     )
     return cur.fetchone()["count"] >= SHIPS_PER_PLAYER
+
+
+def any_ships_in_game(cur, game_id):
+    cur.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM ships
+        WHERE game_id = %s
+        """,
+        (game_id,)
+    )
+    return cur.fetchone()["count"] > 0
 
 
 def all_players_placed(cur, game_id):
@@ -773,7 +785,14 @@ def join_game(game_id):
 
                 existing = player_in_game(cur, game_id, player_id)
                 if existing:
-                    if existing["turn_order"] == 0:
+                    player_count = count_players_in_game(cur, game_id)
+                    creator_setup_retry = (
+                        existing["turn_order"] == 0
+                        and player_count == 1
+                        and game["status"] == WAITING_STATUS
+                        and not any_ships_in_game(cur, game_id)
+                    )
+                    if creator_setup_retry:
                         return jsonify({
                             "status": "joined",
                             "game_id": game_id,
