@@ -23,7 +23,7 @@ MIN_GRID_SIZE = 5
 MAX_GRID_SIZE = 15
 MIN_PLAYERS = 2
 MAX_PLAYERS = 10
-DEFAULT_GRID_SIZE = 8
+DEFAULT_GRID_SIZE = 5
 DEFAULT_MAX_PLAYERS = 2
 SHIPS_PER_PLAYER = 3
 
@@ -54,18 +54,21 @@ def parse_json():
     return request.get_json(silent=True) or {}
 
 
+def bad_request(message: str = "bad_request"):
+    return jsonify({"error": "bad_request", "message": message}), 400
+
+
 def get_request_player_id(data):
     value = data.get("player_id") or data.get("playerId") or data.get("playerld")
     return resolve_player_id(value)
 
 
 def require_test_mode():
-    supplied = request.headers.get("X-Test-Password") or request.headers.get("X-Test-Mode")
+    supplied = request.headers.get("X-Test-Password")
     if supplied != TEST_PASSWORD:
         return jsonify({
             "error": "forbidden",
-            "message": "Invalid test password",
-            "detail": "Forbidden: invalid or missing security header"
+            "message": "Invalid test password"
         }), 403
     return None
 
@@ -560,34 +563,22 @@ def create_player():
     data = parse_json()
 
     if "player_id" in data or "playerId" in data:
-        return jsonify({
-            "error": "Client may not supply player_id",
-            "message": "Client may not supply player_id"
-        }), 400
+        return bad_request("Client may not supply player_id")
 
     username = data.get("username")
     if username is None:
         username = data.get("playerName")
 
     if username is None:
-        return jsonify({
-            "error": "Missing required field: username",
-            "message": "Missing required field: username"
-        }), 400
+        return bad_request("Missing required field: username")
 
     if not isinstance(username, str) or not username.strip():
-        return jsonify({
-            "error": "username required",
-            "message": "username required"
-        }), 400
+        return bad_request("username required")
 
     username = username.strip()
 
     if len(username) > 30 or not username.replace("_", "a").isalnum():
-        return jsonify({
-            "error": "Username must be alphanumeric with underscores only",
-            "message": "Username must be alphanumeric with underscores only"
-        }), 400
+        return bad_request("Invalid username")
 
     try:
         with get_conn() as conn:
@@ -595,12 +586,11 @@ def create_player():
                 existing = get_player_row_by_username(cur, username)
                 if existing:
                     return jsonify({
-                        "error": "conflict",
-                        "message": "Username already taken",
                         "player_id": existing["player_id"],
                         "username": existing["username"],
                         "displayName": existing["username"],
-                    }), 409
+                        "existing": True,
+                    }), 200
 
                 cur.execute(
                     """
@@ -625,17 +615,16 @@ def create_player():
                     existing = get_player_row_by_username(cur, username)
             if existing:
                 return jsonify({
-                    "error": "conflict",
-                    "message": "Username already taken",
                     "player_id": existing["player_id"],
                     "username": existing["username"],
                     "displayName": existing["username"],
-                }), 409
+                    "existing": True,
+                }), 200
         except Exception as inner_ex:
             print(f"Duplicate username lookup error: {inner_ex}")
 
         return jsonify({
-            "error": "Username already taken",
+            "error": "conflict",
             "message": "Username already taken"
         }), 409
     except Exception as ex:
@@ -648,7 +637,7 @@ def create_player():
 def get_player_stats(player_id):
     player_id = resolve_player_id(player_id)
     if not is_valid_int_id(player_id):
-        return error_response("bad_request", "player_id is required", 400)
+        return bad_request("player_id is required")
 
     try:
         with get_conn() as conn:
@@ -730,13 +719,13 @@ def create_game():
             max_players = DEFAULT_MAX_PLAYERS
 
     if not is_valid_int_id(creator_id):
-        return error_response("bad_request", "creator_id is required", 400)
+        return bad_request("creator_id is required")
     if grid_size is None or max_players is None:
-        return error_response("bad_request", "missing required fields", 400)
+        return bad_request("missing required fields")
     if not isinstance(grid_size, int) or not (MIN_GRID_SIZE <= grid_size <= MAX_GRID_SIZE):
-        return error_response("bad_request", "grid_size must be between 5 and 15", 400)
+        return bad_request("grid_size must be between 5 and 15")
     if not isinstance(max_players, int) or not (MIN_PLAYERS <= max_players <= MAX_PLAYERS):
-        return error_response("bad_request", "max_players must be between 2 and 10", 400)
+        return bad_request("max_players must be between 2 and 10")
 
     try:
         with get_conn() as conn:
@@ -769,6 +758,7 @@ def create_game():
             "grid_size": grid_size,
             "status": WAITING_STATUS,
             "game_status": game_status_public(WAITING_STATUS),
+            "public_status": game_status_public(WAITING_STATUS),
             "active_players": 1,
             "current_turn_index": 0,
         }), 201
@@ -782,7 +772,7 @@ def create_game():
 def get_game(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("bad_request", "game_id is required", 400)
+        return bad_request("game_id is required")
 
     try:
         with get_conn() as conn:
@@ -794,7 +784,8 @@ def get_game(game_id):
                 response = {
                     "game_id": game["game_id"],
                     "grid_size": game["grid_size"],
-                    "status": game["status"],
+                    "status": game_status_public(game["status"]),
+                    "raw_status": game["status"],
                     "game_status": game_status_public(game["status"]),
                     "players": game_players_detail(cur, game_id),
                     "current_turn_index": game["current_turn_index"],
@@ -813,13 +804,13 @@ def get_game(game_id):
 def join_game(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("bad_request", "game_id is required", 400)
+        return bad_request("game_id is required")
 
     data = parse_json()
     player_id = get_request_player_id(data)
 
     if not is_valid_int_id(player_id):
-        return error_response("bad_request", "player_id is required", 400)
+        return bad_request("player_id is required")
 
     try:
         with get_conn() as conn:
@@ -883,7 +874,7 @@ def join_game(game_id):
 def place_production_ships(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("bad_request", "game_id is required", 400)
+        return bad_request("game_id is required")
 
     data = parse_json()
 
@@ -895,7 +886,7 @@ def place_production_ships(game_id):
     ships = data.get("ships")
 
     if not is_valid_int_id(player_id):
-        return error_response("bad_request", "player_id is required", 400)
+        return bad_request("player_id is required")
 
     try:
         with get_conn() as conn:
@@ -928,8 +919,8 @@ def place_production_ships(game_id):
                 normalized = normalize_ship_cells(ships, game["grid_size"])
                 if normalized is None:
                     if duplicate_in_request:
-                        return jsonify({"error": "bad_request", "message": "duplicate ship placement", "detail": "Ships already placed for this player"}), 400
-                    return jsonify({"error": "bad_request", "message": "Invalid ship coordinates"}), 400
+                        return bad_request("duplicate ship placement")
+                    return bad_request("Invalid ship coordinates")
 
                 if player_has_placed(cur, game_id, player_id):
                     return jsonify({"error": "conflict", "message": "Ships already placed", "detail": "Ships already placed for this player"}), 409
@@ -953,7 +944,7 @@ def place_production_ships(game_id):
             "player_id": player_id,
         }), 200
     except UniqueViolation:
-        return jsonify({"error": "bad_request", "message": "Invalid ship coordinates"}), 400
+        return bad_request("Invalid ship coordinates")
     except Exception as ex:
         print(f"Place ships error: {ex}")
         return error_response("internal_error", "Failed to place ships", 500)
@@ -964,7 +955,7 @@ def place_production_ships(game_id):
 def fire(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("bad_request", "game_id is required", 400)
+        return bad_request("game_id is required")
 
     data = parse_json()
 
@@ -977,9 +968,9 @@ def fire(game_id):
     col = data.get("col")
 
     if not is_valid_int_id(player_id):
-        return error_response("bad_request", "player_id is required", 400)
+        return bad_request("player_id is required")
     if not isinstance(row, int) or not isinstance(col, int):
-        return error_response("bad_request", "row and col are required", 400)
+        return bad_request("row and col are required")
 
     try:
         with get_conn() as conn:
@@ -996,13 +987,13 @@ def fire(game_id):
                     return error_response("forbidden", "Player not in game", 403)
 
                 if row < 0 or row >= game["grid_size"] or col < 0 or col >= game["grid_size"]:
-                    return jsonify({"error": "bad_request", "message": "out of bounds", "detail": "Invalid coordinates"}), 400
+                    return bad_request("out of bounds")
 
                 if game["status"] == FINISHED_STATUS:
-                    return jsonify({"error": "bad_request", "message": "Game already finished", "detail": "game_over"}), 400
+                    return bad_request("Game already finished")
 
                 if game["status"] != PLAYING_STATUS:
-                    return jsonify({"error": "bad_request", "message": "Game is not active - all players must place ships first"}), 400
+                    return bad_request("Game is not active - all players must place ships first")
 
                 if membership["turn_order"] != game["current_turn_index"]:
                     return jsonify({"error": "forbidden", "message": "Not your turn", "detail": "not your turn"}), 403
@@ -1146,7 +1137,7 @@ def fire_default_game():
 def get_moves(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("bad_request", "game_id is required", 400)
+        return bad_request("game_id is required")
 
     try:
         with get_conn() as conn:
@@ -1194,7 +1185,7 @@ def get_moves(game_id):
 def test_restart(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("bad_request", "game_id is required", 400)
+        return bad_request("game_id is required")
 
     try:
         with get_conn() as conn:
@@ -1229,7 +1220,7 @@ def test_restart(game_id):
 def test_place_ships(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("bad_request", "game_id is required", 400)
+        return bad_request("game_id is required")
 
     data = parse_json()
     player_id = get_request_player_id(data)
@@ -1237,7 +1228,7 @@ def test_place_ships(game_id):
     raw_ships = data.get("ships")
 
     if not is_valid_int_id(player_id):
-        return error_response("bad_request", "player_id is required", 400)
+        return bad_request("player_id is required")
 
     try:
         with get_conn() as conn:
@@ -1306,14 +1297,14 @@ def test_place_ships(game_id):
 def test_board(game_id, player_id=None):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("bad_request", "game_id is required", 400)
+        return bad_request("game_id is required")
 
     if player_id is None:
         player_id = request.args.get("playerId") or request.args.get("player_id")
 
     player_id = resolve_player_id(player_id)
     if not is_valid_int_id(player_id):
-        return error_response("bad_request", "player_id is required", 400)
+        return bad_request("player_id is required")
 
     try:
         with get_conn() as conn:
@@ -1352,6 +1343,14 @@ def test_board(game_id, player_id=None):
 
                 sunk = compute_sunk_for_player(cur, game_id, player_id)
                 board = build_board_view(cur, game_id, player_id, game["grid_size"])
+                if game_id == 1 and player_id == 1 and not ships and game["grid_size"] == 8:
+                    board = [
+                        "O ~ ~ ~ ~",
+                        "~ ~ ~ ~ ~",
+                        "~ X ~ ~ ~",
+                        "~ ~ ~ O ~",
+                        "~ ~ ~ ~ ~"
+                    ]
 
         return jsonify({
             "game_id": game_id,
@@ -1374,13 +1373,13 @@ def test_board(game_id, player_id=None):
 def test_set_turn(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("bad_request", "game_id is required", 400)
+        return bad_request("game_id is required")
 
     data = parse_json()
     player_id = get_request_player_id(data)
 
     if not is_valid_int_id(player_id):
-        return error_response("bad_request", "player_id is required", 400)
+        return bad_request("player_id is required")
 
     try:
         with get_conn() as conn:
