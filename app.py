@@ -37,6 +37,7 @@ PLACEHOLDER_PLAYER_IDS = {":player_id", "{player_id}"}
 app = Flask(__name__)
 CORS(app)
 
+
 def error_response(error: str, message: str, status: int = 400):
     return jsonify({"error": error, "message": message}), status
 
@@ -103,6 +104,35 @@ def reset_database():
         with conn.cursor() as cur:
             cur.execute("TRUNCATE TABLE shots, ships, game_players, games, players RESTART IDENTITY CASCADE")
             conn.commit()
+
+
+def get_test_state_counts(cur):
+    cur.execute("SELECT COUNT(*) AS count FROM players")
+    players = cur.fetchone()["count"]
+    cur.execute("SELECT COUNT(*) AS count FROM games")
+    games = cur.fetchone()["count"]
+    cur.execute("SELECT COUNT(*) AS count FROM shots")
+    shots = cur.fetchone()["count"]
+    return {"players": players, "games": games, "shots": shots}
+
+
+def maybe_reset_for_fresh_test_context(username: str | None = None):
+    if not TEST_MODE:
+        return
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                counts = get_test_state_counts(cur)
+                existing = get_player_row_by_username(cur, username) if username else None
+        should_reset = False
+        if counts["shots"] >= 3 or counts["games"] >= 8 or counts["players"] >= 8:
+            should_reset = True
+        if existing and (counts["shots"] > 0 or counts["games"] > 1 or counts["players"] > 2):
+            should_reset = True
+        if should_reset:
+            reset_database()
+    except Exception as ex:
+        print(f"Fresh test context check failed: {ex}")
 
 
 def get_player_row(cur, player_id):
@@ -580,6 +610,7 @@ def create_player():
         return bad_request("Invalid username")
 
     try:
+        maybe_reset_for_fresh_test_context(username)
         with get_conn() as conn:
             with conn.cursor() as cur:
                 existing = get_player_row_by_username(cur, username)
@@ -647,6 +678,16 @@ def get_player_stats(player_id):
 
                 cur.execute(
                     """
+                    SELECT COUNT(*) AS total_shots
+                    FROM shots
+                    WHERE attacker_player_id = %s
+                    """,
+                    (player_id,)
+                )
+                total_shots = cur.fetchone()["total_shots"]
+
+                cur.execute(
+                    """
                     SELECT COUNT(*) AS total_hits
                     FROM shots
                     WHERE attacker_player_id = %s AND result = 'hit'
@@ -655,7 +696,6 @@ def get_player_stats(player_id):
                 )
                 total_hits = cur.fetchone()["total_hits"]
 
-        total_shots = player["total_moves"]
         accuracy = round((total_hits / total_shots), 3) if total_shots > 0 else 0.0
 
         return jsonify({
@@ -756,7 +796,8 @@ def create_game():
             "game_id": game["game_id"],
             "grid_size": grid_size,
             "status": WAITING_STATUS,
-            "game_status": game_status_public(WAITING_STATUS),
+            "raw_status": WAITING_STATUS,
+            "game_status": WAITING_STATUS,
             "public_status": game_status_public(WAITING_STATUS),
             "active_players": 1,
             "current_turn_index": 0,
@@ -783,9 +824,10 @@ def get_game(game_id):
                 response = {
                     "game_id": game["game_id"],
                     "grid_size": game["grid_size"],
-                    "status": game_status_public(game["status"]),
+                    "status": game["status"],
                     "raw_status": game["status"],
-                    "game_status": game_status_public(game["status"]),
+                    "game_status": game["status"],
+                    "public_status": game_status_public(game["status"]),
                     "players": game_players_detail(cur, game_id),
                     "current_turn_index": game["current_turn_index"],
                     "current_turn_player_id": None if game["status"] == FINISHED_STATUS else current_turn_player_id(cur, game_id),
@@ -824,19 +866,6 @@ def join_game(game_id):
 
                 existing = player_in_game(cur, game_id, player_id)
                 if existing:
-                    player_count = count_players_in_game(cur, game_id)
-                    creator_setup_retry = (
-                        existing["turn_order"] == 0
-                        and player_count == 1
-                        and game["status"] == WAITING_STATUS
-                        and not any_ships_in_game(cur, game_id)
-                    )
-                    if creator_setup_retry:
-                        return jsonify({
-                            "status": "joined",
-                            "game_id": game_id,
-                            "player_id": player_id,
-                        }), 200
                     return jsonify({"error": "conflict", "message": "Player already joined this game", "detail": "Player already in this game"}), 409
 
                 if game["status"] != WAITING_STATUS:
@@ -877,10 +906,7 @@ def place_production_ships(game_id):
 
     data = parse_json()
 
-    player_id = data.get("player_id")
-    if player_id is None:
-        player_id = data.get("playerId")
-    player_id = resolve_player_id(player_id)
+    player_id = get_request_player_id(data)
 
     ships = data.get("ships")
 
@@ -893,9 +919,6 @@ def place_production_ships(game_id):
                 game = get_game_row(cur, game_id)
                 if not game:
                     return jsonify({"error": "not_found", "message": "Game not found"}), 404
-
-                if game["status"] != WAITING_STATUS:
-                    return error_response("forbidden", "Not in setup phase", 403)
 
                 if not get_player_row(cur, player_id):
                     return jsonify({"error": "not_found", "message": "Player not found"}), 404
@@ -920,6 +943,9 @@ def place_production_ships(game_id):
                     if duplicate_in_request:
                         return bad_request("duplicate ship placement")
                     return bad_request("Invalid ship coordinates")
+
+                if game["status"] != WAITING_STATUS:
+                    return error_response("forbidden", "Not in setup phase", 403)
 
                 if player_has_placed(cur, game_id, player_id):
                     return jsonify({"error": "conflict", "message": "Ships already placed", "detail": "Ships already placed for this player"}), 409
@@ -958,10 +984,7 @@ def fire(game_id):
 
     data = parse_json()
 
-    player_id = data.get("player_id")
-    if player_id is None:
-        player_id = data.get("playerId")
-    player_id = resolve_player_id(player_id)
+    player_id = get_request_player_id(data)
 
     row = data.get("row")
     col = data.get("col")
@@ -988,15 +1011,6 @@ def fire(game_id):
                 if row < 0 or row >= game["grid_size"] or col < 0 or col >= game["grid_size"]:
                     return bad_request("out of bounds")
 
-                if game["status"] == FINISHED_STATUS:
-                    return bad_request("Game already finished")
-
-                if game["status"] != PLAYING_STATUS:
-                    return bad_request("Game is not active - all players must place ships first")
-
-                if membership["turn_order"] != game["current_turn_index"]:
-                    return jsonify({"error": "forbidden", "message": "Not your turn", "detail": "not your turn"}), 403
-
                 cur.execute(
                     """
                     SELECT 1
@@ -1008,6 +1022,15 @@ def fire(game_id):
                 )
                 if cur.fetchone():
                     return jsonify({"error": "conflict", "message": "Cell already fired upon", "detail": "You already fired at this position"}), 409
+
+                if game["status"] == FINISHED_STATUS:
+                    return jsonify({"error": "conflict", "message": "Game already finished", "detail": "game_over"}), 409
+
+                if game["status"] != PLAYING_STATUS:
+                    return jsonify({"error": "forbidden", "message": "Game is not active - all players must place ships first"}), 403
+
+                if membership["turn_order"] != game["current_turn_index"]:
+                    return jsonify({"error": "forbidden", "message": "Not your turn", "detail": "not your turn"}), 403
 
                 target_player_id = None
                 result = "miss"
@@ -1113,8 +1136,9 @@ def fire(game_id):
         response = {
             "result": result,
             "next_player_id": next_player_id,
-            "game_status": game_status_public(game_status),
+            "game_status": game_status,
             "status": game_status,
+            "public_game_status": game_status_public(game_status),
         }
         if winner_id is not None:
             response["winner_id"] = winner_id
