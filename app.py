@@ -37,7 +37,6 @@ PLACEHOLDER_PLAYER_IDS = {":player_id", "{player_id}"}
 app = Flask(__name__)
 CORS(app)
 
-
 def error_response(error: str, message: str, status: int = 400):
     return jsonify({"error": error, "message": message}), status
 
