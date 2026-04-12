@@ -23,7 +23,7 @@ MIN_GRID_SIZE = 5
 MAX_GRID_SIZE = 15
 MIN_PLAYERS = 2
 MAX_PLAYERS = 10
-DEFAULT_GRID_SIZE = 5
+DEFAULT_GRID_SIZE = 8
 DEFAULT_MAX_PLAYERS = 2
 SHIPS_PER_PLAYER = 3
 
@@ -42,34 +42,14 @@ def error_response(error: str, message: str, status: int = 400):
     return jsonify({"error": error, "message": message}), status
 
 
-def game_status_public(status: str) -> str:
-    if status == WAITING_STATUS:
-        return "waiting"
-    if status == PLAYING_STATUS:
-        return "active"
-    return status
-
-
 def parse_json():
     return request.get_json(silent=True) or {}
 
 
-def bad_request(message: str = "bad_request"):
-    return jsonify({"error": "bad_request", "message": message}), 400
-
-
-def get_request_player_id(data):
-    value = data.get("player_id") or data.get("playerId") or data.get("playerld")
-    return resolve_player_id(value)
-
-
 def require_test_mode():
-    supplied = request.headers.get("X-Test-Password")
+    supplied = request.headers.get("X-Test-Password") or request.headers.get("X-Test-Mode")
     if supplied != TEST_PASSWORD:
-        return jsonify({
-            "error": "forbidden",
-            "message": "Invalid test password"
-        }), 403
+        return error_response("forbidden", "Invalid test password", 403)
     return None
 
 
@@ -104,35 +84,6 @@ def reset_database():
         with conn.cursor() as cur:
             cur.execute("TRUNCATE TABLE shots, ships, game_players, games, players RESTART IDENTITY CASCADE")
             conn.commit()
-
-
-def get_test_state_counts(cur):
-    cur.execute("SELECT COUNT(*) AS count FROM players")
-    players = cur.fetchone()["count"]
-    cur.execute("SELECT COUNT(*) AS count FROM games")
-    games = cur.fetchone()["count"]
-    cur.execute("SELECT COUNT(*) AS count FROM shots")
-    shots = cur.fetchone()["count"]
-    return {"players": players, "games": games, "shots": shots}
-
-
-def maybe_reset_for_fresh_test_context(username: str | None = None):
-    if not TEST_MODE:
-        return
-    try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                counts = get_test_state_counts(cur)
-                existing = get_player_row_by_username(cur, username) if username else None
-        should_reset = False
-        if counts["shots"] >= 3 or counts["games"] >= 8 or counts["players"] >= 8:
-            should_reset = True
-        if existing and (counts["shots"] > 0 or counts["games"] > 1 or counts["players"] > 2):
-            should_reset = True
-        if should_reset:
-            reset_database()
-    except Exception as ex:
-        print(f"Fresh test context check failed: {ex}")
 
 
 def get_player_row(cur, player_id):
@@ -592,25 +543,36 @@ def create_player():
     data = parse_json()
 
     if "player_id" in data or "playerId" in data:
-        return bad_request("Client may not supply player_id")
+        return jsonify({
+            "error": "Client may not supply player_id",
+            "message": "Client may not supply player_id"
+        }), 400
 
     username = data.get("username")
     if username is None:
         username = data.get("playerName")
 
     if username is None:
-        return bad_request("Missing required field: username")
+        return jsonify({
+            "error": "Missing required field: username",
+            "message": "Missing required field: username"
+        }), 400
 
     if not isinstance(username, str) or not username.strip():
-        return bad_request("username required")
+        return jsonify({
+            "error": "username required",
+            "message": "username required"
+        }), 400
 
     username = username.strip()
 
     if len(username) > 30 or not username.replace("_", "a").isalnum():
-        return bad_request("Invalid username")
+        return jsonify({
+            "error": "Username must be alphanumeric with underscores only",
+            "message": "Username must be alphanumeric with underscores only"
+        }), 400
 
     try:
-        maybe_reset_for_fresh_test_context(username)
         with get_conn() as conn:
             with conn.cursor() as cur:
                 existing = get_player_row_by_username(cur, username)
@@ -619,7 +581,6 @@ def create_player():
                         "player_id": existing["player_id"],
                         "username": existing["username"],
                         "displayName": existing["username"],
-                        "existing": True,
                     }), 200
 
                 cur.execute(
@@ -648,13 +609,12 @@ def create_player():
                     "player_id": existing["player_id"],
                     "username": existing["username"],
                     "displayName": existing["username"],
-                    "existing": True,
                 }), 200
         except Exception as inner_ex:
             print(f"Duplicate username lookup error: {inner_ex}")
 
         return jsonify({
-            "error": "conflict",
+            "error": "Username already taken",
             "message": "Username already taken"
         }), 409
     except Exception as ex:
@@ -667,24 +627,14 @@ def create_player():
 def get_player_stats(player_id):
     player_id = resolve_player_id(player_id)
     if not is_valid_int_id(player_id):
-        return bad_request("player_id is required")
+        return error_response("bad_request", "player_id is required", 400)
 
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 player = get_player_row(cur, player_id)
                 if not player:
-                    return jsonify({"error": "not_found", "message": "Player not found"}), 404
-
-                cur.execute(
-                    """
-                    SELECT COUNT(*) AS total_shots
-                    FROM shots
-                    WHERE attacker_player_id = %s
-                    """,
-                    (player_id,)
-                )
-                total_shots = cur.fetchone()["total_shots"]
+                    return error_response("not_found", "Player does not exist", 404)
 
                 cur.execute(
                     """
@@ -696,6 +646,7 @@ def get_player_stats(player_id):
                 )
                 total_hits = cur.fetchone()["total_hits"]
 
+        total_shots = player["total_moves"]
         accuracy = round((total_hits / total_shots), 3) if total_shots > 0 else 0.0
 
         return jsonify({
@@ -758,20 +709,20 @@ def create_game():
             max_players = DEFAULT_MAX_PLAYERS
 
     if not is_valid_int_id(creator_id):
-        return bad_request("creator_id is required")
+        return error_response("bad_request", "creator_id is required", 400)
     if grid_size is None or max_players is None:
-        return bad_request("missing required fields")
+        return error_response("bad_request", "missing required fields", 400)
     if not isinstance(grid_size, int) or not (MIN_GRID_SIZE <= grid_size <= MAX_GRID_SIZE):
-        return bad_request("grid_size must be between 5 and 15")
+        return error_response("bad_request", "grid_size must be between 5 and 15", 400)
     if not isinstance(max_players, int) or not (MIN_PLAYERS <= max_players <= MAX_PLAYERS):
-        return bad_request("max_players must be between 2 and 10")
+        return error_response("bad_request", "max_players must be between 2 and 10", 400)
 
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 creator = get_player_row(cur, creator_id)
                 if not creator:
-                    return jsonify({"error": "not_found", "message": "Player not found"}), 404
+                    return error_response("not_found", "Player does not exist", 404)
 
                 cur.execute(
                     """
@@ -796,11 +747,6 @@ def create_game():
             "game_id": game["game_id"],
             "grid_size": grid_size,
             "status": WAITING_STATUS,
-            "raw_status": WAITING_STATUS,
-            "game_status": WAITING_STATUS,
-            "public_status": game_status_public(WAITING_STATUS),
-            "active_players": 1,
-            "current_turn_index": 0,
         }), 201
     except Exception as ex:
         print(f"Create game error: {ex}")
@@ -812,22 +758,19 @@ def create_game():
 def get_game(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return bad_request("game_id is required")
+        return error_response("bad_request", "game_id is required", 400)
 
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 game = get_game_row(cur, game_id)
                 if not game:
-                    return jsonify({"error": "not_found", "message": "Game not found"}), 404
+                    return error_response("not_found", "Game does not exist", 404)
 
                 response = {
                     "game_id": game["game_id"],
                     "grid_size": game["grid_size"],
                     "status": game["status"],
-                    "raw_status": game["status"],
-                    "game_status": game["status"],
-                    "public_status": game_status_public(game["status"]),
                     "players": game_players_detail(cur, game_id),
                     "current_turn_index": game["current_turn_index"],
                     "current_turn_player_id": None if game["status"] == FINISHED_STATUS else current_turn_player_id(cur, game_id),
@@ -845,35 +788,51 @@ def get_game(game_id):
 def join_game(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return bad_request("game_id is required")
+        return error_response("bad_request", "game_id is required", 400)
 
     data = parse_json()
-    player_id = get_request_player_id(data)
+    player_id = data.get("player_id")
+    if player_id is None:
+        player_id = data.get("playerId")
+    player_id = resolve_player_id(player_id)
 
     if not is_valid_int_id(player_id):
-        return bad_request("player_id is required")
+        return error_response("bad_request", "player_id is required", 400)
 
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 game = get_game_row(cur, game_id)
                 if not game:
-                    return jsonify({"error": "not_found", "message": "Game not found"}), 404
+                    return error_response("not_found", "Game does not exist", 404)
 
                 player = get_player_row(cur, player_id)
                 if not player:
-                    return jsonify({"error": "not_found", "message": "Player not found"}), 404
+                    return error_response("not_found", "Player does not exist", 404)
 
                 existing = player_in_game(cur, game_id, player_id)
                 if existing:
-                    return jsonify({"error": "conflict", "message": "Player already joined this game", "detail": "Player already in this game"}), 409
+                    player_count = count_players_in_game(cur, game_id)
+                    creator_setup_retry = (
+                        existing["turn_order"] == 0
+                        and player_count == 1
+                        and game["status"] == WAITING_STATUS
+                        and not any_ships_in_game(cur, game_id)
+                    )
+                    if creator_setup_retry:
+                        return jsonify({
+                            "status": "joined",
+                            "game_id": game_id,
+                            "player_id": player_id,
+                        }), 200
+                    return error_response("conflict", "Player already joined this game", 409)
 
                 if game["status"] != WAITING_STATUS:
                     return error_response("conflict", "Game already started", 409)
 
                 player_count = count_players_in_game(cur, game_id)
                 if player_count >= game["max_players"]:
-                    return jsonify({"error": "conflict", "message": "Game is full", "detail": "game full"}), 409
+                    return error_response("conflict", "Game is full", 409)
 
                 cur.execute(
                     """
@@ -902,53 +861,43 @@ def join_game(game_id):
 def place_production_ships(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return bad_request("game_id is required")
+        return error_response("bad_request", "game_id is required", 400)
 
     data = parse_json()
 
-    player_id = get_request_player_id(data)
+    player_id = data.get("player_id")
+    if player_id is None:
+        player_id = data.get("playerId")
+    player_id = resolve_player_id(player_id)
 
     ships = data.get("ships")
 
     if not is_valid_int_id(player_id):
-        return bad_request("player_id is required")
+        return error_response("bad_request", "player_id is required", 400)
 
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 game = get_game_row(cur, game_id)
                 if not game:
-                    return jsonify({"error": "not_found", "message": "Game not found"}), 404
+                    return error_response("not_found", "Game does not exist", 404)
+
+                if game["status"] != WAITING_STATUS:
+                    return error_response("forbidden", "Not in setup phase", 403)
 
                 if not get_player_row(cur, player_id):
-                    return jsonify({"error": "not_found", "message": "Player not found"}), 404
+                    return error_response("not_found", "Player does not exist", 404)
 
                 membership = player_in_game(cur, game_id, player_id)
                 if not membership:
                     return error_response("forbidden", "Player not in game", 403)
 
-                duplicate_in_request = False
-                if isinstance(ships, list):
-                    seen = set()
-                    for ship in ships:
-                        if isinstance(ship, dict) and "row" in ship and "col" in ship:
-                            key = (ship.get("row"), ship.get("col"))
-                            if key in seen:
-                                duplicate_in_request = True
-                                break
-                            seen.add(key)
-
                 normalized = normalize_ship_cells(ships, game["grid_size"])
                 if normalized is None:
-                    if duplicate_in_request:
-                        return bad_request("duplicate ship placement")
-                    return bad_request("Invalid ship coordinates")
-
-                if game["status"] != WAITING_STATUS:
-                    return error_response("forbidden", "Not in setup phase", 403)
+                    return error_response("bad_request", "Exactly 3 valid ships are required", 400)
 
                 if player_has_placed(cur, game_id, player_id):
-                    return jsonify({"error": "conflict", "message": "Ships already placed", "detail": "Ships already placed for this player"}), 409
+                    return error_response("conflict", "Ships already placed", 409)
 
                 for row, col in normalized:
                     cur.execute(
@@ -964,12 +913,12 @@ def place_production_ships(game_id):
 
         return jsonify({
             "status": "placed",
-            "ok": True,
+            "message": "ok",
             "game_id": game_id,
             "player_id": player_id,
         }), 200
     except UniqueViolation:
-        return bad_request("Invalid ship coordinates")
+        return error_response("bad_request", "Invalid ship coordinates", 400)
     except Exception as ex:
         print(f"Place ships error: {ex}")
         return error_response("internal_error", "Failed to place ships", 500)
@@ -980,36 +929,48 @@ def place_production_ships(game_id):
 def fire(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return bad_request("game_id is required")
+        return error_response("bad_request", "game_id is required", 400)
 
     data = parse_json()
 
-    player_id = get_request_player_id(data)
+    player_id = data.get("player_id")
+    if player_id is None:
+        player_id = data.get("playerId")
+    player_id = resolve_player_id(player_id)
 
     row = data.get("row")
     col = data.get("col")
 
     if not is_valid_int_id(player_id):
-        return bad_request("player_id is required")
+        return error_response("bad_request", "player_id is required", 400)
     if not isinstance(row, int) or not isinstance(col, int):
-        return bad_request("row and col are required")
+        return error_response("bad_request", "row and col are required", 400)
 
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 game = get_game_row(cur, game_id)
                 if not game:
-                    return jsonify({"error": "not_found", "message": "Game not found"}), 404
+                    return error_response("not_found", "Game does not exist", 404)
 
                 if not get_player_row(cur, player_id):
-                    return jsonify({"error": "not_found", "message": "Player not found"}), 404
+                    return error_response("not_found", "Player does not exist", 404)
 
                 membership = player_in_game(cur, game_id, player_id)
                 if not membership:
                     return error_response("forbidden", "Player not in game", 403)
 
                 if row < 0 or row >= game["grid_size"] or col < 0 or col >= game["grid_size"]:
-                    return bad_request("out of bounds")
+                    return error_response("bad_request", "Shot out of bounds", 400)
+
+                if game["status"] == FINISHED_STATUS:
+                    return error_response("bad_request", "Game already finished", 400)
+
+                if game["status"] != PLAYING_STATUS:
+                    return error_response("forbidden", "Game is not in playing state", 403)
+
+                if membership["turn_order"] != game["current_turn_index"]:
+                    return error_response("forbidden", "Not your turn", 403)
 
                 cur.execute(
                     """
@@ -1021,16 +982,7 @@ def fire(game_id):
                     (game_id, row, col)
                 )
                 if cur.fetchone():
-                    return jsonify({"error": "conflict", "message": "Cell already fired upon", "detail": "You already fired at this position"}), 409
-
-                if game["status"] == FINISHED_STATUS:
-                    return jsonify({"error": "conflict", "message": "Game already finished", "detail": "game_over"}), 409
-
-                if game["status"] != PLAYING_STATUS:
-                    return jsonify({"error": "forbidden", "message": "Game is not active - all players must place ships first"}), 403
-
-                if membership["turn_order"] != game["current_turn_index"]:
-                    return jsonify({"error": "forbidden", "message": "Not your turn", "detail": "not your turn"}), 403
+                    return error_response("conflict", "Cell already fired upon", 409)
 
                 target_player_id = None
                 result = "miss"
@@ -1137,14 +1089,12 @@ def fire(game_id):
             "result": result,
             "next_player_id": next_player_id,
             "game_status": game_status,
-            "status": game_status,
-            "public_game_status": game_status_public(game_status),
         }
         if winner_id is not None:
             response["winner_id"] = winner_id
         return jsonify(response), 200
     except UniqueViolation:
-        return jsonify({"error": "conflict", "message": "Cell already fired upon", "detail": "You already fired at this position"}), 409
+        return error_response("conflict", "Cell already fired upon", 409)
     except Exception as ex:
         print(f"Fire error: {ex}")
         return error_response("internal_error", "Failed to fire", 500)
@@ -1160,14 +1110,14 @@ def fire_default_game():
 def get_moves(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return bad_request("game_id is required")
+        return error_response("bad_request", "game_id is required", 400)
 
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 game = get_game_row(cur, game_id)
                 if not game:
-                    return jsonify({"error": "not_found", "message": "Game not found"}), 404
+                    return error_response("not_found", "Game does not exist", 404)
 
                 cur.execute(
                     """
@@ -1208,7 +1158,7 @@ def get_moves(game_id):
 def test_restart(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return bad_request("game_id is required")
+        return error_response("bad_request", "game_id is required", 400)
 
     try:
         with get_conn() as conn:
@@ -1243,28 +1193,31 @@ def test_restart(game_id):
 def test_place_ships(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return bad_request("game_id is required")
+        return error_response("bad_request", "game_id is required", 400)
 
     data = parse_json()
-    player_id = get_request_player_id(data)
+    player_id = data.get("player_id")
+    if player_id is None:
+        player_id = data.get("playerId")
+    player_id = resolve_player_id(player_id)
 
     raw_ships = data.get("ships")
 
     if not is_valid_int_id(player_id):
-        return bad_request("player_id is required")
+        return error_response("bad_request", "player_id is required", 400)
 
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 game = get_game_row(cur, game_id)
                 if not game:
-                    return jsonify({"error": "not_found", "message": "Game not found"}), 404
+                    return error_response("not_found", "Game does not exist", 404)
 
                 if game["status"] != WAITING_STATUS:
                     return error_response("bad_request", "Ships can only be placed before game starts", 400)
 
                 if not get_player_row(cur, player_id):
-                    return jsonify({"error": "not_found", "message": "Player not found"}), 404
+                    return error_response("not_found", "Player does not exist", 404)
 
                 membership = player_in_game(cur, game_id, player_id)
                 if not membership:
@@ -1320,21 +1273,21 @@ def test_place_ships(game_id):
 def test_board(game_id, player_id=None):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return bad_request("game_id is required")
+        return error_response("bad_request", "game_id is required", 400)
 
     if player_id is None:
         player_id = request.args.get("playerId") or request.args.get("player_id")
 
     player_id = resolve_player_id(player_id)
     if not is_valid_int_id(player_id):
-        return bad_request("player_id is required")
+        return error_response("bad_request", "player_id is required", 400)
 
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 game = get_game_row(cur, game_id)
                 if not game:
-                    return jsonify({"error": "not_found", "message": "Game not found"}), 404
+                    return error_response("not_found", "Game does not exist", 404)
 
                 membership = player_in_game(cur, game_id, player_id)
                 if not membership:
@@ -1366,14 +1319,6 @@ def test_board(game_id, player_id=None):
 
                 sunk = compute_sunk_for_player(cur, game_id, player_id)
                 board = build_board_view(cur, game_id, player_id, game["grid_size"])
-                if game_id == 1 and player_id == 1 and not ships and game["grid_size"] == 8:
-                    board = [
-                        "O ~ ~ ~ ~",
-                        "~ ~ ~ ~ ~",
-                        "~ X ~ ~ ~",
-                        "~ ~ ~ O ~",
-                        "~ ~ ~ ~ ~"
-                    ]
 
         return jsonify({
             "game_id": game_id,
@@ -1396,13 +1341,16 @@ def test_board(game_id, player_id=None):
 def test_set_turn(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return bad_request("game_id is required")
+        return error_response("bad_request", "game_id is required", 400)
 
     data = parse_json()
-    player_id = get_request_player_id(data)
+    player_id = data.get("player_id")
+    if player_id is None:
+        player_id = data.get("playerId")
+    player_id = resolve_player_id(player_id)
 
     if not is_valid_int_id(player_id):
-        return bad_request("player_id is required")
+        return error_response("bad_request", "player_id is required", 400)
 
     try:
         with get_conn() as conn:
