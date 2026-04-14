@@ -1160,26 +1160,12 @@ def test_restart(game_id):
     if not is_valid_int_id(game_id):
         return error_response("bad_request", "game_id is required", 400)
 
+    test_check = require_test_mode()
+    if test_check:
+        return test_check
+
     try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                game = get_game_row(cur, game_id)
-
-                if game:
-                    cur.execute("DELETE FROM ships WHERE game_id = %s", (game_id,))
-                    cur.execute("DELETE FROM shots WHERE game_id = %s", (game_id,))
-                    cur.execute(
-                        """
-                        UPDATE games
-                        SET status = %s,
-                            current_turn_index = 0
-                        WHERE game_id = %s
-                        """,
-                        (WAITING_STATUS, game_id)
-                    )
-
-                conn.commit()
-
+        reset_database()
         return jsonify({"status": "reset", "game_id": game_id}), 200
     except Exception as ex:
         print(f"Test restart error: {ex}")
