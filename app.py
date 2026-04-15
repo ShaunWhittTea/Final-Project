@@ -87,18 +87,15 @@ def reset_database():
             conn.commit()
 
 
-def ensure_player_stats_cache():
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS player_stats_cache (
-                    player_id INTEGER PRIMARY KEY,
-                    total_hits INTEGER NOT NULL DEFAULT 0
-                )
-                """
-            )
-            conn.commit()
+def ensure_player_stats_cache(cur):
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS player_stats_cache (
+            player_id INTEGER PRIMARY KEY REFERENCES players(player_id) ON DELETE CASCADE,
+            total_hits INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
 
 
 def get_player_row(cur, player_id):
@@ -495,9 +492,16 @@ def build_board_view(cur, game_id, player_id, grid_size):
 
 try:
     init_db()
-    ensure_player_stats_cache()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            ensure_player_stats_cache(cur)
+            conn.commit()
     if TEST_MODE and AUTO_RESET_ON_START:
         reset_database()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                ensure_player_stats_cache(cur)
+                conn.commit()
         print("Auto reset on startup completed.")
 except Exception as ex:
     print(f"DB init/startup reset failed: {ex}")
@@ -509,6 +513,10 @@ def guard_test_routes_and_lazy_reset():
     if TEST_MODE and AUTO_RESET_ON_START and not INITIAL_RESET_DONE:
         try:
             reset_database()
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    ensure_player_stats_cache(cur)
+                    conn.commit()
             INITIAL_RESET_DONE = True
             print("Lazy auto reset before first request completed.")
         except Exception as ex:
@@ -566,6 +574,10 @@ def list_games():
 def system_reset():
     try:
         reset_database()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                ensure_player_stats_cache(cur)
+                conn.commit()
         return jsonify({"status": "reset"}), 200
     except Exception as ex:
         print(f"System reset error: {ex}")
@@ -609,6 +621,7 @@ def create_player():
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
+                ensure_player_stats_cache(cur)
                 existing = get_player_row_by_username(cur, username)
                 if existing:
                     return jsonify({
@@ -672,20 +685,30 @@ def get_player_stats(player_id):
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
+                ensure_player_stats_cache(cur)
                 player = get_player_row(cur, player_id)
                 if not player:
                     return error_response("not_found", "Player does not exist", 404)
 
                 cur.execute(
                     """
-                    SELECT COUNT(*) AS total_hits_live,
-                           COUNT(*) FILTER (WHERE result IN ('hit', 'miss')) AS total_shots_live
+                    SELECT COUNT(*) AS live_total_shots
                     FROM shots
                     WHERE attacker_player_id = %s
                     """,
                     (player_id,)
                 )
-                live_stats = cur.fetchone()
+                live_total_shots = cur.fetchone()["live_total_shots"]
+
+                cur.execute(
+                    """
+                    SELECT COUNT(*) AS live_total_hits
+                    FROM shots
+                    WHERE attacker_player_id = %s AND result = 'hit'
+                    """,
+                    (player_id,)
+                )
+                live_total_hits = cur.fetchone()["live_total_hits"]
 
                 cur.execute(
                     """
@@ -695,10 +718,11 @@ def get_player_stats(player_id):
                     """,
                     (player_id,)
                 )
-                cached = cur.fetchone()
+                cache_row = cur.fetchone()
+                cached_total_hits = cache_row["total_hits"] if cache_row else 0
 
-        total_shots = max(player["total_moves"], live_stats["total_shots_live"] or 0)
-        total_hits = max((cached["total_hits"] if cached else 0), live_stats["total_hits_live"] or 0)
+        total_shots = max(player["total_moves"], live_total_shots)
+        total_hits = max(cached_total_hits, live_total_hits)
         accuracy = round((total_hits / total_shots), 3) if total_shots > 0 else 0.0
 
         return jsonify({
@@ -1083,8 +1107,8 @@ def fire(game_id):
                     """,
                     (player_id,)
                 )
-
                 if result == "hit":
+                    ensure_player_stats_cache(cur)
                     cur.execute(
                         """
                         INSERT INTO player_stats_cache (player_id, total_hits)
