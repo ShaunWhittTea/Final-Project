@@ -1191,6 +1191,13 @@ def test_restart(game_id):
                 cur.execute("DELETE FROM shots WHERE game_id = %s", (game_id,))
                 cur.execute(
                     """
+                    DELETE FROM game_players
+                    WHERE game_id = %s AND turn_order <> 0
+                    """,
+                    (game_id,)
+                )
+                cur.execute(
+                    """
                     UPDATE games
                     SET status = %s,
                         current_turn_index = 0
