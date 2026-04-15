@@ -5,8 +5,12 @@ CREATE TABLE IF NOT EXISTS players (
     total_games INT NOT NULL DEFAULT 0,
     total_wins INT NOT NULL DEFAULT 0,
     total_losses INT NOT NULL DEFAULT 0,
-    total_moves INT NOT NULL DEFAULT 0
+    total_moves INT NOT NULL DEFAULT 0,
+    total_hits INT NOT NULL DEFAULT 0
 );
+
+ALTER TABLE players
+    ADD COLUMN IF NOT EXISTS total_hits INT NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS games (
     game_id SERIAL PRIMARY KEY,
