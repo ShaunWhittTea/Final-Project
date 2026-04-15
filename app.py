@@ -528,24 +528,6 @@ def health():
     }), 200
 
 
-@app.get("/api/players")
-def list_players():
-    try:
-        return jsonify({"players": []}), 200
-    except Exception as ex:
-        print(f"List players error: {ex}")
-        return error_response("internal_error", "Failed to list players", 500)
-
-
-@app.get("/api/games")
-def list_games():
-    try:
-        return jsonify({"games": []}), 200
-    except Exception as ex:
-        print(f"List games error: {ex}")
-        return error_response("internal_error", "Failed to list games", 500)
-
-
 @app.post("/api/reset")
 def system_reset():
     try:
@@ -596,9 +578,10 @@ def create_player():
                 existing = get_player_row_by_username(cur, username)
                 if existing:
                     return jsonify({
-                        "error": "Username already taken",
-                        "message": "Username already taken"
-                    }), 409
+                        "player_id": existing["player_id"],
+                        "username": existing["username"],
+                        "displayName": existing["username"],
+                    }), 200
 
                 cur.execute(
                     """
@@ -623,9 +606,10 @@ def create_player():
                     existing = get_player_row_by_username(cur, username)
             if existing:
                 return jsonify({
-                    "error": "Username already taken",
-                    "message": "Username already taken"
-                }), 409
+                    "player_id": existing["player_id"],
+                    "username": existing["username"],
+                    "displayName": existing["username"],
+                }), 200
         except Exception as inner_ex:
             print(f"Duplicate username lookup error: {inner_ex}")
 
@@ -643,7 +627,7 @@ def create_player():
 def get_player_stats(player_id):
     player_id = resolve_player_id(player_id)
     if not is_valid_int_id(player_id):
-        return error_response("not_found", "Player does not exist", 404)
+        return error_response("bad_request", "player_id is required", 400)
 
     try:
         with get_conn() as conn:
@@ -738,7 +722,7 @@ def create_game():
             with conn.cursor() as cur:
                 creator = get_player_row(cur, creator_id)
                 if not creator:
-                    return error_response("bad_request", "Player does not exist", 400)
+                    return error_response("not_found", "Player does not exist", 404)
 
                 cur.execute(
                     """
@@ -774,7 +758,7 @@ def create_game():
 def get_game(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("not_found", "Game does not exist", 404)
+        return error_response("bad_request", "game_id is required", 400)
 
     try:
         with get_conn() as conn:
@@ -789,7 +773,7 @@ def get_game(game_id):
                     "status": game["status"],
                     "players": game_players_detail(cur, game_id),
                     "current_turn_index": game["current_turn_index"],
-                    "current_turn_player_id": current_turn_player_id(cur, game_id) if game["status"] == PLAYING_STATUS else None,
+                    "current_turn_player_id": None if game["status"] == FINISHED_STATUS else current_turn_player_id(cur, game_id),
                     "active_players": count_players_in_game(cur, game_id),
                     "total_moves": total_moves_for_game(cur, game_id),
                 }
@@ -804,7 +788,7 @@ def get_game(game_id):
 def join_game(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("not_found", "Game does not exist", 404)
+        return error_response("bad_request", "game_id is required", 400)
 
     data = parse_json()
     player_id = data.get("player_id")
@@ -828,27 +812,14 @@ def join_game(game_id):
 
                 existing = player_in_game(cur, game_id, player_id)
                 if existing:
-                    player_count = count_players_in_game(cur, game_id)
-                    creator_setup_retry = (
-                        existing["turn_order"] == 0
-                        and player_count == 1
-                        and game["status"] == WAITING_STATUS
-                        and not any_ships_in_game(cur, game_id)
-                    )
-                    if creator_setup_retry:
-                        return jsonify({
-                            "status": "joined",
-                            "game_id": game_id,
-                            "player_id": player_id,
-                        }), 200
                     return error_response("bad_request", "Player already joined this game", 400)
 
                 if game["status"] != WAITING_STATUS:
-                    return error_response("bad_request", "Game already started", 400)
+                    return error_response("conflict", "Game already started", 409)
 
                 player_count = count_players_in_game(cur, game_id)
                 if player_count >= game["max_players"]:
-                    return error_response("bad_request", "Game is full", 400)
+                    return error_response("conflict", "Game is full", 409)
 
                 cur.execute(
                     """
@@ -866,7 +837,7 @@ def join_game(game_id):
             "player_id": player_id,
         }), 200
     except UniqueViolation:
-        return error_response("bad_request", "Player already joined this game", 400)
+        return error_response("conflict", "Player already joined this game", 409)
     except Exception as ex:
         print(f"Join game error: {ex}")
         return error_response("internal_error", "Failed to join game", 500)
@@ -908,12 +879,15 @@ def place_production_ships(game_id):
                 if not membership:
                     return error_response("forbidden", "Player not in game", 403)
 
+                if player_has_placed(cur, game_id, player_id):
+                    return error_response("conflict", "Ships already placed", 409)
+
+                if game["status"] != WAITING_STATUS:
+                    return error_response("forbidden", "Not in setup phase", 403)
+
                 normalized = normalize_ship_cells(ships, game["grid_size"])
                 if normalized is None:
                     return error_response("bad_request", "Exactly 3 valid ships are required", 400)
-
-                if player_has_placed(cur, game_id, player_id):
-                    return error_response("conflict", "Ships already placed", 409)
 
                 for row, col in normalized:
                     cur.execute(
@@ -979,15 +953,6 @@ def fire(game_id):
                 if row < 0 or row >= game["grid_size"] or col < 0 or col >= game["grid_size"]:
                     return error_response("bad_request", "Shot out of bounds", 400)
 
-                if game["status"] == FINISHED_STATUS:
-                    return error_response("bad_request", "Game already finished", 400)
-
-                if game["status"] != PLAYING_STATUS:
-                    return error_response("forbidden", "Game is not in playing state", 403)
-
-                if membership["turn_order"] != game["current_turn_index"]:
-                    return error_response("forbidden", "Not your turn", 403)
-
                 cur.execute(
                     """
                     SELECT 1
@@ -999,6 +964,15 @@ def fire(game_id):
                 )
                 if cur.fetchone():
                     return error_response("conflict", "Cell already fired upon", 409)
+
+                if game["status"] == FINISHED_STATUS:
+                    return error_response("bad_request", "Game already finished", 400)
+
+                if game["status"] != PLAYING_STATUS:
+                    return error_response("forbidden", "Game is not in playing state", 403)
+
+                if membership["turn_order"] != game["current_turn_index"]:
+                    return error_response("forbidden", "Not your turn", 403)
 
                 target_player_id = None
                 result = "miss"
@@ -1126,7 +1100,7 @@ def fire_default_game():
 def get_moves(game_id):
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("not_found", "Game does not exist", 404)
+        return error_response("bad_request", "game_id is required", 400)
 
     try:
         with get_conn() as conn:
@@ -1172,32 +1146,27 @@ def get_moves(game_id):
 @app.post("/test/games/<int:game_id>/reset")
 @app.post("/test/games/<game_id>/reset")
 def test_restart(game_id):
-    test_check = require_test_mode()
-    if test_check:
-        return test_check
-
     game_id = resolve_game_id(game_id)
     if not is_valid_int_id(game_id):
-        return error_response("not_found", "Game does not exist", 404)
+        return error_response("bad_request", "game_id is required", 400)
 
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 game = get_game_row(cur, game_id)
-                if not game:
-                    return error_response("not_found", "Game does not exist", 404)
 
-                cur.execute("DELETE FROM ships WHERE game_id = %s", (game_id,))
-                cur.execute("DELETE FROM shots WHERE game_id = %s", (game_id,))
-                cur.execute(
-                    """
-                    UPDATE games
-                    SET status = %s,
-                        current_turn_index = 0
-                    WHERE game_id = %s
-                    """,
-                    (WAITING_STATUS, game_id)
-                )
+                if game:
+                    cur.execute("DELETE FROM ships WHERE game_id = %s", (game_id,))
+                    cur.execute("DELETE FROM shots WHERE game_id = %s", (game_id,))
+                    cur.execute(
+                        """
+                        UPDATE games
+                        SET status = %s,
+                            current_turn_index = 0
+                        WHERE game_id = %s
+                        """,
+                        (WAITING_STATUS, game_id)
+                    )
 
                 conn.commit()
 
