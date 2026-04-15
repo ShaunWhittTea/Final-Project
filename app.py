@@ -1187,23 +1187,63 @@ def test_restart(game_id):
                 if not game:
                     return error_response("not_found", "Game does not exist", 404)
 
-                cur.execute("DELETE FROM ships WHERE game_id = %s", (game_id,))
-                cur.execute("DELETE FROM shots WHERE game_id = %s", (game_id,))
                 cur.execute(
                     """
-                    DELETE FROM game_players
-                    WHERE game_id = %s AND turn_order <> 0
+                    SELECT p.player_id, gp.turn_order, p.total_games, p.total_wins, p.total_losses, p.total_moves
+                    FROM game_players gp
+                    JOIN players p ON p.player_id = gp.player_id
+                    WHERE gp.game_id = %s
+                    ORDER BY gp.turn_order
                     """,
                     (game_id,)
                 )
+                preserved_players = cur.fetchall()
+                if not preserved_players:
+                    return error_response("not_found", "Game does not exist", 404)
+
+                creator_id = preserved_players[0]["player_id"]
+                game_grid_size = game["grid_size"]
+                game_max_players = game["max_players"]
+
+                reset_database()
+
+                for row in preserved_players:
+                    cur.execute(
+                        """
+                        INSERT INTO players (player_id, username, total_games, total_wins, total_losses, total_moves)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            row["player_id"],
+                            f"restored_player_{row['player_id']}_{game_id}",
+                            row["total_games"],
+                            row["total_wins"],
+                            row["total_losses"],
+                            row["total_moves"],
+                        )
+                    )
+
                 cur.execute(
                     """
-                    UPDATE games
-                    SET status = %s,
-                        current_turn_index = 0
-                    WHERE game_id = %s
+                    INSERT INTO games (game_id, status, grid_size, max_players, current_turn_index)
+                    VALUES (%s, %s, %s, %s, 0)
                     """,
-                    (WAITING_STATUS, game_id)
+                    (game_id, WAITING_STATUS, game_grid_size, game_max_players)
+                )
+
+                cur.execute(
+                    """
+                    INSERT INTO game_players (game_id, player_id, turn_order)
+                    VALUES (%s, %s, 0)
+                    """,
+                    (game_id, creator_id)
+                )
+
+                cur.execute(
+                    "SELECT setval(pg_get_serial_sequence('players', 'player_id'), GREATEST(COALESCE((SELECT MAX(player_id) FROM players), 1), 1), true)"
+                )
+                cur.execute(
+                    "SELECT setval(pg_get_serial_sequence('games', 'game_id'), GREATEST(COALESCE((SELECT MAX(game_id) FROM games), 1), 1), true)"
                 )
 
                 conn.commit()
