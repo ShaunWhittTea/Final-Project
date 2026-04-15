@@ -83,6 +83,21 @@ def reset_database():
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("TRUNCATE TABLE shots, ships, game_players, games, players RESTART IDENTITY CASCADE")
+            cur.execute("DROP TABLE IF EXISTS player_stats_cache")
+            conn.commit()
+
+
+def ensure_player_stats_cache():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS player_stats_cache (
+                    player_id INTEGER PRIMARY KEY,
+                    total_hits INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
             conn.commit()
 
 
@@ -480,6 +495,7 @@ def build_board_view(cur, game_id, player_id, grid_size):
 
 try:
     init_db()
+    ensure_player_stats_cache()
     if TEST_MODE and AUTO_RESET_ON_START:
         reset_database()
         print("Auto reset on startup completed.")
@@ -609,6 +625,14 @@ def create_player():
                     (username,)
                 )
                 player = cur.fetchone()
+                cur.execute(
+                    """
+                    INSERT INTO player_stats_cache (player_id, total_hits)
+                    VALUES (%s, 0)
+                    ON CONFLICT (player_id) DO NOTHING
+                    """,
+                    (player["player_id"],)
+                )
                 conn.commit()
 
         return jsonify({
@@ -654,15 +678,27 @@ def get_player_stats(player_id):
 
                 cur.execute(
                     """
-                    SELECT COUNT(*) AS total_hits
+                    SELECT COUNT(*) AS total_hits_live,
+                           COUNT(*) FILTER (WHERE result IN ('hit', 'miss')) AS total_shots_live
                     FROM shots
-                    WHERE attacker_player_id = %s AND result = 'hit'
+                    WHERE attacker_player_id = %s
                     """,
                     (player_id,)
                 )
-                total_hits = cur.fetchone()["total_hits"]
+                live_stats = cur.fetchone()
 
-        total_shots = player["total_moves"]
+                cur.execute(
+                    """
+                    SELECT total_hits
+                    FROM player_stats_cache
+                    WHERE player_id = %s
+                    """,
+                    (player_id,)
+                )
+                cached = cur.fetchone()
+
+        total_shots = max(player["total_moves"], live_stats["total_shots_live"] or 0)
+        total_hits = max((cached["total_hits"] if cached else 0), live_stats["total_hits_live"] or 0)
         accuracy = round((total_hits / total_shots), 3) if total_shots > 0 else 0.0
 
         return jsonify({
@@ -1047,6 +1083,17 @@ def fire(game_id):
                     """,
                     (player_id,)
                 )
+
+                if result == "hit":
+                    cur.execute(
+                        """
+                        INSERT INTO player_stats_cache (player_id, total_hits)
+                        VALUES (%s, 1)
+                        ON CONFLICT (player_id)
+                        DO UPDATE SET total_hits = player_stats_cache.total_hits + 1
+                        """,
+                        (player_id,)
+                    )
 
                 survivors = surviving_players(cur, game_id)
                 winner_id = None
