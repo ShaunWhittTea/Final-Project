@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
 from psycopg.errors import UniqueViolation
@@ -486,6 +486,9 @@ try:
 except Exception as ex:
     print(f"DB init/startup reset failed: {ex}")
 
+@app.get("/")
+def serve_frontend():
+    return send_from_directory("frontend", "index.html")
 
 @app.before_request
 def guard_test_routes_and_lazy_reset():
