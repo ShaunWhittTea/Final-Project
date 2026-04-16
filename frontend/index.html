@@ -3,333 +3,349 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Battleship Multi-Game</title>
+  <title>Battleship</title>
   <style>
-    :root {
-      --bg: #0f172a;
-      --panel: #111827;
-      --panel-2: #1f2937;
-      --accent: #38bdf8;
-      --accent-2: #22c55e;
-      --danger: #ef4444;
-      --warn: #f59e0b;
-      --text: #e5e7eb;
-      --muted: #94a3b8;
-      --border: #334155;
-      --water: #0ea5e9;
-      --ship: #22c55e;
-      --hit: #ef4444;
-      --miss: #94a3b8;
-      --empty: #1e293b;
+    :root{
+      --bg:#0f172a;
+      --panel:#111827;
+      --panel-2:#1f2937;
+      --border:#334155;
+      --text:#e5e7eb;
+      --muted:#94a3b8;
+      --accent:#38bdf8;
+      --success:#22c55e;
+      --warning:#f59e0b;
+      --danger:#ef4444;
+      --water:#1e293b;
+      --ship:#14532d;
+      --ship-border:#22c55e;
+      --hit:#7f1d1d;
+      --hit-border:#ef4444;
+      --miss:#334155;
+      --miss-border:#94a3b8;
+      --glow:0 10px 30px rgba(0,0,0,.25);
     }
 
-    * {
-      box-sizing: border-box;
+    * { box-sizing:border-box; }
+
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      background:linear-gradient(180deg,#020617,#0f172a);
+      color:var(--text);
+      min-height:100vh;
     }
 
-    body {
-      margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
-      background: linear-gradient(180deg, #020617, #0f172a);
-      color: var(--text);
-      min-height: 100vh;
+    .container{
+      max-width:1320px;
+      margin:0 auto;
+      padding:24px;
     }
 
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 24px;
+    .hero{
+      background:linear-gradient(135deg,#0f172a,#1e293b);
+      border:1px solid var(--border);
+      border-radius:20px;
+      padding:24px;
+      margin-bottom:20px;
+      box-shadow:var(--glow);
     }
 
-    .hero {
-      background: linear-gradient(135deg, #0f172a, #1e293b);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 22px;
-      margin-bottom: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    .hero h1{
+      margin:0 0 8px 0;
+      font-size:2.2rem;
     }
 
-    h1, h2, h3 {
-      margin-top: 0;
+    .hero p{
+      margin:0;
+      color:var(--muted);
+      line-height:1.5;
     }
 
-    h1 {
-      margin-bottom: 8px;
-      font-size: 2rem;
+    .hidden{
+      display:none !important;
     }
 
-    .subtitle {
-      color: var(--muted);
-      margin: 0;
+    .layout{
+      display:grid;
+      grid-template-columns:360px 1fr;
+      gap:20px;
     }
 
-    .grid-layout {
-      display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: 20px;
+    .left, .right{
+      display:flex;
+      flex-direction:column;
+      gap:20px;
     }
 
-    .left-column,
-    .right-column {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
+    .card{
+      background:rgba(17,24,39,.97);
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:18px;
+      box-shadow:0 8px 24px rgba(0,0,0,.18);
     }
 
-    .card {
-      background: rgba(17, 24, 39, 0.96);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 18px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    h2, h3{
+      margin-top:0;
+      margin-bottom:12px;
     }
 
-    .row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
+    label{
+      display:block;
+      margin-bottom:6px;
+      color:var(--muted);
+      font-size:.92rem;
     }
 
-    .row > * {
-      flex: 1;
-      min-width: 120px;
+    input, button{
+      width:100%;
+      padding:11px 12px;
+      border-radius:11px;
+      font-size:.96rem;
+      border:1px solid var(--border);
     }
 
-    label {
-      display: block;
-      font-size: 0.9rem;
-      color: var(--muted);
-      margin-bottom: 6px;
+    input{
+      background:#0b1220;
+      color:var(--text);
     }
 
-    input, select, button, textarea {
-      width: 100%;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #0b1220;
-      color: var(--text);
-      padding: 10px 12px;
-      font-size: 0.95rem;
+    button{
+      border:none;
+      cursor:pointer;
+      font-weight:700;
+      transition:transform .08s ease, opacity .08s ease;
+      background:var(--accent);
+      color:#001018;
     }
 
-    textarea {
-      min-height: 100px;
-      resize: vertical;
-      font-family: inherit;
+    button:hover{
+      transform:translateY(-1px);
+      opacity:.96;
     }
 
-    button {
-      cursor: pointer;
-      background: var(--accent);
-      color: #001018;
-      font-weight: 700;
-      border: none;
-      transition: transform 0.12s ease, opacity 0.12s ease;
+    button.secondary{
+      background:#334155;
+      color:var(--text);
     }
 
-    button:hover {
-      transform: translateY(-1px);
-      opacity: 0.95;
+    button.success{
+      background:var(--success);
+      color:#04120a;
     }
 
-    button.secondary {
-      background: #334155;
-      color: var(--text);
+    button.warning{
+      background:var(--warning);
+      color:#1f1300;
     }
 
-    button.success {
-      background: var(--accent-2);
-      color: #04120a;
+    button.danger{
+      background:var(--danger);
+      color:white;
     }
 
-    button.warn {
-      background: var(--warn);
-      color: #1f1300;
+    .row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
     }
 
-    button.danger {
-      background: var(--danger);
-      color: white;
+    .row > *{
+      flex:1;
+      min-width:120px;
     }
 
-    .small {
-      font-size: 0.85rem;
-      color: var(--muted);
+    .status-box{
+      background:#020617;
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:12px;
+      line-height:1.5;
     }
 
-    .status-box {
-      background: #020617;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px;
-      line-height: 1.5;
+    .small{
+      color:var(--muted);
+      font-size:.88rem;
     }
 
-    .pill {
-      display: inline-block;
-      border-radius: 999px;
-      padding: 4px 10px;
-      font-size: 0.8rem;
-      font-weight: bold;
-      background: #1e293b;
-      border: 1px solid var(--border);
-      margin-right: 8px;
-      margin-bottom: 8px;
+    .big-center{
+      text-align:center;
+      padding:34px 18px;
     }
 
-    .pill.playing { background: rgba(34,197,94,0.15); border-color: #15803d; color: #86efac; }
-    .pill.waiting { background: rgba(245,158,11,0.15); border-color: #b45309; color: #fde68a; }
-    .pill.finished { background: rgba(239,68,68,0.15); border-color: #b91c1c; color: #fecaca; }
-
-    .boards {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
+    .big-center h2{
+      font-size:1.8rem;
+      margin-bottom:10px;
     }
 
-    .board-card h3 {
-      margin-bottom: 8px;
+    .big-center p{
+      color:var(--muted);
+      margin-bottom:18px;
+      line-height:1.55;
     }
 
-    .board {
-      display: grid;
-      gap: 4px;
-      justify-content: start;
-      margin-top: 12px;
-      user-select: none;
+    .pill{
+      display:inline-block;
+      border-radius:999px;
+      padding:5px 10px;
+      font-size:.82rem;
+      font-weight:700;
+      background:#1e293b;
+      border:1px solid var(--border);
+      margin-right:6px;
+      margin-bottom:6px;
     }
 
-    .cell {
-      width: 34px;
-      height: 34px;
-      border-radius: 8px;
-      border: 1px solid #475569;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.85rem;
-      font-weight: bold;
-      background: var(--empty);
-      cursor: pointer;
-      transition: transform 0.08s ease, border-color 0.08s ease, opacity 0.08s ease;
+    .pill.waiting{
+      background:rgba(245,158,11,.14);
+      border-color:#b45309;
+      color:#fde68a;
     }
 
-    .cell:hover {
-      transform: scale(1.03);
-      border-color: var(--accent);
+    .pill.playing{
+      background:rgba(34,197,94,.14);
+      border-color:#15803d;
+      color:#bbf7d0;
     }
 
-    .cell.label {
-      background: transparent;
-      border: none;
-      color: var(--muted);
-      cursor: default;
-      font-weight: bold;
+    .pill.finished{
+      background:rgba(239,68,68,.14);
+      border-color:#b91c1c;
+      color:#fecaca;
     }
 
-    .cell.label:hover {
-      transform: none;
-      border-color: transparent;
+    .boards{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:20px;
     }
 
-    .cell.ship {
-      background: rgba(34,197,94,0.22);
-      border-color: #22c55e;
+    .board{
+      display:grid;
+      gap:4px;
+      justify-content:start;
+      margin-top:12px;
     }
 
-    .cell.hit {
-      background: rgba(239,68,68,0.25);
-      border-color: #ef4444;
-      color: #fecaca;
+    .cell{
+      width:34px;
+      height:34px;
+      border-radius:8px;
+      border:1px solid #475569;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:.82rem;
+      font-weight:700;
+      background:var(--water);
+      user-select:none;
     }
 
-    .cell.miss {
-      background: rgba(148,163,184,0.18);
-      border-color: #94a3b8;
-      color: #cbd5e1;
+    .cell.label{
+      background:transparent;
+      border:none;
+      color:var(--muted);
     }
 
-    .cell.selected {
-      outline: 2px solid #f8fafc;
-      outline-offset: 1px;
+    .cell.clickable{
+      cursor:pointer;
     }
 
-    .cell.disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .cell.clickable:hover{
+      transform:scale(1.03);
+      border-color:var(--accent);
     }
 
-    .log {
-      background: #020617;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px;
-      max-height: 260px;
-      overflow: auto;
-      font-family: Consolas, monospace;
-      font-size: 0.9rem;
-      white-space: pre-wrap;
-      line-height: 1.4;
+    .cell.ship{
+      background:var(--ship);
+      border-color:var(--ship-border);
     }
 
-    .move-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-height: 300px;
-      overflow: auto;
-      margin-top: 10px;
+    .cell.hit{
+      background:var(--hit);
+      border-color:var(--hit-border);
+      color:#fecaca;
     }
 
-    .move-item {
-      background: #020617;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px;
-      font-size: 0.92rem;
+    .cell.miss{
+      background:var(--miss);
+      border-color:var(--miss-border);
+      color:#cbd5e1;
     }
 
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-top: 10px;
+    .cell.selected{
+      outline:2px solid white;
+      outline-offset:1px;
     }
 
-    .stat {
-      background: #020617;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px;
-      text-align: center;
+    .cell.disabled{
+      opacity:.55;
+      cursor:not-allowed;
     }
 
-    .stat-value {
-      display: block;
-      font-size: 1.4rem;
-      font-weight: bold;
-      margin-top: 4px;
+    .moves{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      max-height:320px;
+      overflow:auto;
+      margin-top:8px;
     }
 
-    .footer-note {
-      margin-top: 10px;
-      color: var(--muted);
-      font-size: 0.85rem;
+    .move{
+      background:#020617;
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:10px;
+      font-size:.92rem;
     }
 
-    @media (max-width: 1100px) {
-      .grid-layout,
-      .boards {
-        grid-template-columns: 1fr;
+    .log{
+      background:#020617;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:12px;
+      max-height:240px;
+      overflow:auto;
+      white-space:pre-wrap;
+      font-family:Consolas, monospace;
+      font-size:.9rem;
+      line-height:1.4;
+    }
+
+    .stats{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:10px;
+      margin-top:10px;
+    }
+
+    .stat{
+      background:#020617;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:12px;
+      text-align:center;
+    }
+
+    .stat b{
+      display:block;
+      margin-top:4px;
+      font-size:1.3rem;
+    }
+
+    @media (max-width:1100px){
+      .layout, .boards{
+        grid-template-columns:1fr;
       }
     }
 
-    @media (max-width: 700px) {
-      .cell {
-        width: 28px;
-        height: 28px;
-        font-size: 0.72rem;
+    @media (max-width:700px){
+      .cell{
+        width:28px;
+        height:28px;
+        font-size:.72rem;
       }
     }
   </style>
@@ -337,122 +353,172 @@
 <body>
   <div class="container">
     <div class="hero">
-      <h1>Battleship Multi-Game Server UI</h1>
-      <p class="subtitle">
-        Frontend for your Flask/Postgres Battleship API. Create players, create/join games, place ships, and fire turns.
+      <h1>Battleship</h1>
+      <p>
+        One tab is one player. Open a second tab with a different username to join the same match and play against yourself.
       </p>
     </div>
 
-    <div class="grid-layout">
-      <div class="left-column">
+    <div class="layout">
+      <div class="left">
         <div class="card">
           <h2>Connection</h2>
           <label for="apiBase">API Base URL</label>
-          <input id="apiBase" type="text" placeholder="https://your-render-app.onrender.com" />
+          <input id="apiBase" type="text" placeholder="https://your-render-app.onrender.com">
           <div class="row" style="margin-top:10px;">
-            <button onclick="saveApiBase()">Save API URL</button>
-            <button class="secondary" onclick="loadApiMetadata()">Ping API</button>
+            <button onclick="saveApiBase()">Save</button>
+            <button class="secondary" onclick="pingApi()">Check API</button>
           </div>
           <div id="apiInfo" class="status-box" style="margin-top:12px;">No API checked yet.</div>
         </div>
 
         <div class="card">
-          <h2>Player</h2>
+          <h2>Your Player</h2>
           <label for="username">Username</label>
-          <input id="username" type="text" placeholder="Enter username" />
+          <input id="username" type="text" placeholder="Enter a username for this tab">
           <div class="row" style="margin-top:10px;">
             <button class="success" onclick="createPlayer()">Create Player</button>
-            <button class="secondary" onclick="loadPlayerStats()">Load Stats</button>
+            <button class="secondary" onclick="loadStats()">Stats</button>
           </div>
 
           <div class="status-box" style="margin-top:12px;">
-            <div><strong>Current Player ID:</strong> <span id="currentPlayerId">None</span></div>
-            <div><strong>Username:</strong> <span id="currentPlayerName">None</span></div>
-          </div>
-
-          <div id="playerStats" class="stats-grid"></div>
-        </div>
-
-        <div class="card">
-          <h2>Game Setup</h2>
-          <label for="gameId">Game ID</label>
-          <input id="gameId" type="number" min="1" placeholder="Enter or create a game" />
-
-          <div class="row" style="margin-top:12px;">
-            <div>
-              <label for="gridSize">Grid Size</label>
-              <input id="gridSize" type="number" min="5" max="15" value="8" />
-            </div>
-            <div>
-              <label for="maxPlayers">Max Players</label>
-              <input id="maxPlayers" type="number" min="2" max="10" value="2" />
+            <div><strong>Player ID:</strong> <span id="playerIdView">None</span></div>
+            <div><strong>Username:</strong> <span id="playerNameView">None</span></div>
+            <div class="small" style="margin-top:8px;">
+              This is stored per tab using <code>sessionStorage</code>.
             </div>
           </div>
 
-          <div class="row" style="margin-top:12px;">
-            <button class="success" onclick="createGame()">Create Game</button>
-            <button class="secondary" onclick="joinGame()">Join Game</button>
-          </div>
-
-          <div class="row" style="margin-top:10px;">
-            <button class="secondary" onclick="refreshGame()">Refresh Game</button>
-            <button class="secondary" onclick="loadMoves()">Load Moves</button>
-          </div>
+          <div id="stats" class="stats"></div>
         </div>
 
         <div class="card">
-          <h2>Placement Controls</h2>
+          <h2>Match</h2>
+
+          <div id="matchCreateJoin">
+            <div class="small" style="margin-bottom:12px;">
+              Create a new match here, or join an existing one from another tab using its game ID.
+            </div>
+
+            <div class="row">
+              <div>
+                <label for="gridSize">Grid Size</label>
+                <input id="gridSize" type="number" min="5" max="15" value="8">
+              </div>
+              <div>
+                <label for="maxPlayers">Max Players</label>
+                <input id="maxPlayers" type="number" min="2" max="10" value="2">
+              </div>
+            </div>
+
+            <div class="row" style="margin-top:12px;">
+              <button class="success" onclick="createGame()">Create Match</button>
+            </div>
+
+            <div style="margin-top:14px;">
+              <label for="gameIdInput">Join by Game ID</label>
+              <input id="gameIdInput" type="number" min="1" placeholder="Enter game ID">
+            </div>
+
+            <div class="row" style="margin-top:10px;">
+              <button class="secondary" onclick="joinGame()">Join Match</button>
+              <button class="secondary" onclick="refreshGame()">Refresh</button>
+            </div>
+          </div>
+
+          <div id="matchCurrent" class="status-box" style="margin-top:14px;">
+            <div><strong>Current Game ID:</strong> <span id="currentGameId">None</span></div>
+          </div>
+        </div>
+
+        <div class="card" id="placementCard">
+          <h2>Place Ships</h2>
           <p class="small">
-            Your production route requires exactly 3 ship cells. Click 3 cells on your board, then press place ships.
+            Select exactly 3 cells on your board, then place your ships.
           </p>
           <div class="status-box">
-            <div><strong>Selected ship cells:</strong> <span id="selectedShipCount">0</span>/3</div>
-            <div><strong>Cells:</strong> <span id="selectedShipCells">None</span></div>
+            <div><strong>Selected:</strong> <span id="selectedCount">0</span>/3</div>
+            <div><strong>Cells:</strong> <span id="selectedCells">None</span></div>
           </div>
-
           <div class="row" style="margin-top:12px;">
             <button class="success" onclick="placeShips()">Place Ships</button>
-            <button class="warn" onclick="clearShipSelection()">Clear Selection</button>
+            <button class="warning" onclick="clearSelection()">Clear</button>
           </div>
         </div>
 
         <div class="card">
-          <h2>Action Log</h2>
-          <div id="log" class="log">UI ready.\n</div>
+          <h2>Log</h2>
+          <div id="log" class="log">Client ready.\n</div>
         </div>
       </div>
 
-      <div class="right-column">
-        <div class="card">
-          <h2>Current Game</h2>
-          <div id="gameSummary" class="status-box">
-            No game loaded yet.
+      <div class="right">
+        <div id="screenNoGame" class="card big-center">
+          <h2>Start a Match</h2>
+          <p>
+            Create a player first. Then create a new match or join one by game ID.
+          </p>
+        </div>
+
+        <div id="screenWaitingOpponent" class="card big-center hidden">
+          <h2>Waiting for Opponent</h2>
+          <p>
+            Share the game ID with another tab or player, then wait for them to join.
+          </p>
+          <div class="status-box" style="max-width:420px; margin:0 auto;">
+            <div><strong>Game ID:</strong> <span id="waitingGameId">None</span></div>
+            <div><strong>Players Joined:</strong> <span id="waitingPlayers">0</span></div>
+          </div>
+          <div class="row" style="margin-top:16px; max-width:420px; margin-left:auto; margin-right:auto;">
+            <button class="secondary" onclick="refreshGame()">Refresh Match</button>
           </div>
         </div>
 
-        <div class="boards">
-          <div class="card board-card">
-            <h3>Your Board</h3>
-            <p class="small">
-              Click cells here to place your ships before the game starts.
-            </p>
-            <div id="myBoard"></div>
+        <div id="screenSetup" class="hidden">
+          <div class="card">
+            <h2>Setup Phase</h2>
+            <div id="setupSummary" class="status-box"></div>
           </div>
 
-          <div class="card board-card">
-            <h3>Target Board</h3>
-            <p class="small">
-              Click cells here to fire during your turn. Red = hit, gray = miss.
-            </p>
-            <div id="targetBoard"></div>
+          <div class="boards">
+            <div class="card">
+              <h3>Your Board</h3>
+              <div class="small">Choose 3 cells for your ships.</div>
+              <div id="myBoardWrapSetup"></div>
+            </div>
+
+            <div class="card big-center">
+              <h2>Waiting for All Players to Place Ships</h2>
+              <p>
+                Once every player has placed ships, the match will begin automatically.
+              </p>
+            </div>
           </div>
         </div>
 
-        <div class="card">
-          <h2>Moves</h2>
-          <div id="moveList" class="move-list"></div>
-          <div class="footer-note">
-            Moves come from <code>/api/games/&lt;game_id&gt;/moves</code>.
+        <div id="screenGame" class="hidden">
+          <div class="card">
+            <h2>Match Status</h2>
+            <div id="gameSummary" class="status-box"></div>
+          </div>
+
+          <div class="boards">
+            <div class="card">
+              <h3>Your Board</h3>
+              <div class="small">Shows your ships and incoming hits or misses.</div>
+              <div id="myBoardWrap"></div>
+            </div>
+
+            <div class="card">
+              <h3>Enemy Grid</h3>
+              <div class="small">Click a square here when it is your turn.</div>
+              <div id="enemyBoardWrap"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Move History</h2>
+            <div id="moves" class="moves"></div>
           </div>
         </div>
       </div>
@@ -460,78 +526,85 @@
   </div>
 
   <script>
+    const TEST_PASSWORD = "clemson-test-2026";
+
     const state = {
-      apiBase: localStorage.getItem("battleship_api_base") || window.location.origin,
-      playerId: Number(localStorage.getItem("battleship_player_id")) || null,
-      username: localStorage.getItem("battleship_username") || "",
-      gameId: Number(localStorage.getItem("battleship_game_id")) || null,
-      gridSize: 8,
+      apiBase: localStorage.getItem("bs_api_base") || window.location.origin,
+      playerId: sessionStorage.getItem("bs_player_id") ? Number(sessionStorage.getItem("bs_player_id")) : null,
+      username: sessionStorage.getItem("bs_username") || "",
+      gameId: sessionStorage.getItem("bs_game_id") ? Number(sessionStorage.getItem("bs_game_id")) : null,
+      gridSize: sessionStorage.getItem("bs_grid_size") ? Number(sessionStorage.getItem("bs_grid_size")) : 8,
       game: null,
-      playerBoardData: null,
+      boardData: null,
+      moves: [],
       selectedShips: [],
-      firedShots: new Set(),
-      pollHandle: null
+      pollId: null
     };
 
-    const els = {
+    const el = {
       apiBase: document.getElementById("apiBase"),
       apiInfo: document.getElementById("apiInfo"),
       username: document.getElementById("username"),
-      currentPlayerId: document.getElementById("currentPlayerId"),
-      currentPlayerName: document.getElementById("currentPlayerName"),
-      playerStats: document.getElementById("playerStats"),
-      gameId: document.getElementById("gameId"),
+      playerIdView: document.getElementById("playerIdView"),
+      playerNameView: document.getElementById("playerNameView"),
+      stats: document.getElementById("stats"),
       gridSize: document.getElementById("gridSize"),
       maxPlayers: document.getElementById("maxPlayers"),
+      gameIdInput: document.getElementById("gameIdInput"),
+      currentGameId: document.getElementById("currentGameId"),
+      selectedCount: document.getElementById("selectedCount"),
+      selectedCells: document.getElementById("selectedCells"),
+      waitingGameId: document.getElementById("waitingGameId"),
+      waitingPlayers: document.getElementById("waitingPlayers"),
+      setupSummary: document.getElementById("setupSummary"),
       gameSummary: document.getElementById("gameSummary"),
-      myBoard: document.getElementById("myBoard"),
-      targetBoard: document.getElementById("targetBoard"),
-      selectedShipCount: document.getElementById("selectedShipCount"),
-      selectedShipCells: document.getElementById("selectedShipCells"),
+      myBoardWrapSetup: document.getElementById("myBoardWrapSetup"),
+      myBoardWrap: document.getElementById("myBoardWrap"),
+      enemyBoardWrap: document.getElementById("enemyBoardWrap"),
+      moves: document.getElementById("moves"),
       log: document.getElementById("log"),
-      moveList: document.getElementById("moveList")
+      placementCard: document.getElementById("placementCard"),
+      screenNoGame: document.getElementById("screenNoGame"),
+      screenWaitingOpponent: document.getElementById("screenWaitingOpponent"),
+      screenSetup: document.getElementById("screenSetup"),
+      screenGame: document.getElementById("screenGame")
     };
 
-    function init() {
-      els.apiBase.value = state.apiBase;
-      els.username.value = state.username;
-      if (state.playerId) els.currentPlayerId.textContent = state.playerId;
-      if (state.username) els.currentPlayerName.textContent = state.username;
-      if (state.gameId) els.gameId.value = state.gameId;
-      if (localStorage.getItem("battleship_grid_size")) {
-        els.gridSize.value = localStorage.getItem("battleship_grid_size");
-      }
-      updateSelectedShipsUI();
-      renderBoards();
-      if (state.apiBase) loadApiMetadata();
-      if (state.playerId) loadPlayerStats();
-      if (state.gameId) refreshGame();
-      startPolling();
-    }
-
-    function log(message, asError = false) {
-      const stamp = new Date().toLocaleTimeString();
-      els.log.textContent += `[${stamp}] ${asError ? "ERROR: " : ""}${message}\n`;
-      els.log.scrollTop = els.log.scrollHeight;
+    function log(msg, isError = false) {
+      const t = new Date().toLocaleTimeString();
+      el.log.textContent += `[${t}] ${isError ? "ERROR: " : ""}${msg}\n`;
+      el.log.scrollTop = el.log.scrollHeight;
     }
 
     function saveApiBase() {
-      state.apiBase = els.apiBase.value.trim().replace(/\/+$/, "");
-      localStorage.setItem("battleship_api_base", state.apiBase);
+      state.apiBase = el.apiBase.value.trim().replace(/\/+$/, "");
+      localStorage.setItem("bs_api_base", state.apiBase);
       log(`Saved API base URL: ${state.apiBase}`);
     }
 
-    function persistPlayer() {
-      if (state.playerId) localStorage.setItem("battleship_player_id", String(state.playerId));
-      if (state.username) localStorage.setItem("battleship_username", state.username);
+    function savePlayerSession() {
+      if (state.playerId) sessionStorage.setItem("bs_player_id", String(state.playerId));
+      if (state.username) sessionStorage.setItem("bs_username", state.username);
     }
 
-    function persistGame() {
-      if (state.gameId) localStorage.setItem("battleship_game_id", String(state.gameId));
-      if (state.gridSize) localStorage.setItem("battleship_grid_size", String(state.gridSize));
+    function saveGameSession() {
+      if (state.gameId) sessionStorage.setItem("bs_game_id", String(state.gameId));
+      sessionStorage.setItem("bs_grid_size", String(state.gridSize));
     }
 
-    async function apiRequest(path, options = {}) {
+    function clearSelection() {
+      state.selectedShips = [];
+      updateSelectionUI();
+      renderSetupBoard();
+      log("Cleared ship selection.");
+    }
+
+    function updateSelectionUI() {
+      el.selectedCount.textContent = state.selectedShips.length;
+      el.selectedCells.textContent = state.selectedShips.length ? state.selectedShips.join(" | ") : "None";
+    }
+
+    async function api(path, options = {}) {
       const url = `${state.apiBase}${path}`;
       const config = {
         method: options.method || "GET",
@@ -545,104 +618,97 @@
         config.body = JSON.stringify(options.body);
       }
 
-      const response = await fetch(url, config);
+      const res = await fetch(url, config);
       let data = null;
 
       try {
-        data = await response.json();
-      } catch {
-        data = null;
-      }
+        data = await res.json();
+      } catch (_) {}
 
-      if (!response.ok) {
-        const message =
-          data?.message ||
-          data?.error ||
-          `Request failed with status ${response.status}`;
-        throw new Error(message);
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
       }
 
       return data;
     }
 
-    async function loadApiMetadata() {
+    async function pingApi() {
       try {
         saveApiBase();
-        const data = await apiRequest("/api/");
-        els.apiInfo.innerHTML = `
+        const data = await api("/api/");
+        el.apiInfo.innerHTML = `
           <div><strong>Name:</strong> ${data.name}</div>
           <div><strong>Version:</strong> ${data.version}</div>
           <div><strong>Spec Version:</strong> ${data.spec_version}</div>
           <div><strong>Environment:</strong> ${data.environment}</div>
-          <div><strong>Test Mode:</strong> ${data.test_mode}</div>
         `;
-        log("Connected to API successfully.");
+        log("Connected to API.");
       } catch (err) {
-        els.apiInfo.textContent = `Could not reach API: ${err.message}`;
-        log(`API ping failed: ${err.message}`, true);
+        el.apiInfo.textContent = `Could not reach API: ${err.message}`;
+        log(`API check failed: ${err.message}`, true);
       }
     }
 
     async function createPlayer() {
-      const username = els.username.value.trim();
+      const username = el.username.value.trim();
       if (!username) {
         log("Enter a username first.", true);
         return;
       }
 
       try {
-        const data = await apiRequest("/api/players", {
+        const data = await api("/api/players", {
           method: "POST",
           body: { username }
         });
 
         state.playerId = data.player_id;
         state.username = data.username;
-        persistPlayer();
+        savePlayerSession();
 
-        els.currentPlayerId.textContent = state.playerId;
-        els.currentPlayerName.textContent = state.username;
+        el.playerIdView.textContent = state.playerId;
+        el.playerNameView.textContent = state.username;
 
         log(`Created player "${state.username}" with ID ${state.playerId}.`);
-        await loadPlayerStats();
+        await loadStats();
       } catch (err) {
         log(`Create player failed: ${err.message}`, true);
       }
     }
 
-    async function loadPlayerStats() {
+    async function loadStats() {
       if (!state.playerId) {
-        log("No player selected.", true);
+        log("No player exists in this tab yet.", true);
         return;
       }
 
       try {
-        const data = await apiRequest(`/api/players/${state.playerId}/stats`);
-        els.playerStats.innerHTML = `
-          <div class="stat"><div>Games</div><span class="stat-value">${data.games_played}</span></div>
-          <div class="stat"><div>Wins</div><span class="stat-value">${data.wins}</span></div>
-          <div class="stat"><div>Losses</div><span class="stat-value">${data.losses}</span></div>
-          <div class="stat"><div>Shots</div><span class="stat-value">${data.shots}</span></div>
-          <div class="stat"><div>Hits</div><span class="stat-value">${data.hits}</span></div>
-          <div class="stat"><div>Accuracy</div><span class="stat-value">${(data.accuracy * 100).toFixed(1)}%</span></div>
+        const data = await api(`/api/players/${state.playerId}/stats`);
+        el.stats.innerHTML = `
+          <div class="stat">Games<b>${data.games_played}</b></div>
+          <div class="stat">Wins<b>${data.wins}</b></div>
+          <div class="stat">Losses<b>${data.losses}</b></div>
+          <div class="stat">Shots<b>${data.shots}</b></div>
+          <div class="stat">Hits<b>${data.hits}</b></div>
+          <div class="stat">Accuracy<b>${(data.accuracy * 100).toFixed(1)}%</b></div>
         `;
         log(`Loaded stats for player ${state.playerId}.`);
       } catch (err) {
-        log(`Load stats failed: ${err.message}`, true);
+        log(`Stats failed: ${err.message}`, true);
       }
     }
 
     async function createGame() {
       if (!state.playerId) {
-        log("Create a player first.", true);
+        log("Create your player first.", true);
         return;
       }
 
-      const gridSize = Number(els.gridSize.value);
-      const maxPlayers = Number(els.maxPlayers.value);
+      const gridSize = Number(el.gridSize.value);
+      const maxPlayers = Number(el.maxPlayers.value);
 
       try {
-        const data = await apiRequest("/api/games", {
+        const data = await api("/api/games", {
           method: "POST",
           body: {
             creator_id: state.playerId,
@@ -653,311 +719,258 @@
 
         state.gameId = data.game_id;
         state.gridSize = data.grid_size;
+        state.game = null;
+        state.boardData = null;
+        state.moves = [];
         state.selectedShips = [];
-        state.firedShots = new Set();
-        persistGame();
 
-        els.gameId.value = state.gameId;
-        updateSelectedShipsUI();
-        renderBoards();
+        saveGameSession();
 
-        log(`Created game ${state.gameId} (grid ${state.gridSize}x${state.gridSize}).`);
+        el.currentGameId.textContent = state.gameId;
+        el.gameIdInput.value = state.gameId;
+        updateSelectionUI();
+
+        log(`Created match ${state.gameId}. Open another tab, create a different player, and join this game ID.`);
         await refreshGame();
       } catch (err) {
-        log(`Create game failed: ${err.message}`, true);
+        log(`Create match failed: ${err.message}`, true);
       }
     }
 
     async function joinGame() {
       if (!state.playerId) {
-        log("Create a player first.", true);
+        log("Create your player first.", true);
         return;
       }
 
-      const gameId = Number(els.gameId.value);
+      const gameId = Number(el.gameIdInput.value);
       if (!gameId) {
-        log("Enter a game ID first.", true);
+        log("Enter a game ID to join.", true);
         return;
       }
 
       try {
-        const data = await apiRequest(`/api/games/${gameId}/join`, {
+        const data = await api(`/api/games/${gameId}/join`, {
           method: "POST",
           body: { player_id: state.playerId }
         });
 
         state.gameId = data.game_id;
-        persistGame();
+        saveGameSession();
 
-        log(`Player ${state.playerId} joined game ${state.gameId}.`);
+        el.currentGameId.textContent = state.gameId;
+        log(`Joined match ${state.gameId} as player ${state.playerId}.`);
         await refreshGame();
       } catch (err) {
-        log(`Join game failed: ${err.message}`, true);
+        log(`Join match failed: ${err.message}`, true);
       }
     }
 
     async function refreshGame() {
-      const gameId = Number(els.gameId.value) || state.gameId;
-      if (!gameId) {
-        log("No game ID set.", true);
+      if (!state.gameId) {
+        renderScreens();
         return;
       }
 
       try {
-        const data = await apiRequest(`/api/games/${gameId}`);
-        state.game = data;
-        state.gameId = data.game_id;
-        state.gridSize = data.grid_size;
-        persistGame();
+        const game = await api(`/api/games/${state.gameId}`);
+        state.game = game;
+        state.gridSize = game.grid_size;
+        saveGameSession();
 
-        els.gameId.value = state.gameId;
-        els.gridSize.value = state.gridSize;
+        el.currentGameId.textContent = state.gameId;
 
-        renderGameSummary();
-        await loadPlayerBoard();
+        await loadBoard();
         await loadMoves();
-        renderBoards();
-        log(`Refreshed game ${state.gameId}.`);
+
+        renderScreens();
       } catch (err) {
-        log(`Refresh game failed: ${err.message}`, true);
+        log(`Refresh failed: ${err.message}`, true);
       }
     }
 
-    async function loadPlayerBoard() {
+    async function loadBoard() {
       if (!state.gameId || !state.playerId) return;
 
       try {
-        const data = await apiRequest(`/api/test/games/${state.gameId}/board/${state.playerId}`);
-        state.playerBoardData = data;
-
-        const fired = new Set();
-        (data.hits || []).forEach(([r, c]) => fired.add(`${r},${c}`));
-        (data.misses || []).forEach(([r, c]) => fired.add(`${r},${c}`));
-        state.firedShots = fired;
+        state.boardData = await api(`/api/test/games/${state.gameId}/board/${state.playerId}`, {
+          headers: {
+            "X-Test-Password": TEST_PASSWORD
+          }
+        });
       } catch (err) {
-        state.playerBoardData = null;
-        log(`Could not load board view: ${err.message}`, true);
+        state.boardData = null;
+        log(`Board load failed: ${err.message}`, true);
       }
     }
 
-    function renderGameSummary() {
-      if (!state.game) {
-        els.gameSummary.textContent = "No game loaded.";
+    async function loadMoves() {
+      if (!state.gameId) return;
+
+      try {
+        const data = await api(`/api/games/${state.gameId}/moves`);
+        state.moves = data.moves || [];
+        renderMoves();
+      } catch (err) {
+        log(`Move history failed: ${err.message}`, true);
+      }
+    }
+
+    function playerHasPlacedShips() {
+      if (!state.boardData) return false;
+      return Array.isArray(state.boardData.ships) && state.boardData.ships.length >= 3;
+    }
+
+    function renderScreens() {
+      el.screenNoGame.classList.add("hidden");
+      el.screenWaitingOpponent.classList.add("hidden");
+      el.screenSetup.classList.add("hidden");
+      el.screenGame.classList.add("hidden");
+      el.placementCard.classList.remove("hidden");
+
+      if (!state.gameId || !state.game) {
+        el.screenNoGame.classList.remove("hidden");
+        el.placementCard.classList.add("hidden");
         return;
       }
 
+      const activePlayers = state.game.active_players || 0;
+      const maxPlayers = 2;
+      const inWaitingForOpponent = state.game.status === "waiting_setup" && activePlayers < maxPlayers;
+
+      if (inWaitingForOpponent) {
+        el.waitingGameId.textContent = state.gameId;
+        el.waitingPlayers.textContent = activePlayers;
+        el.screenWaitingOpponent.classList.remove("hidden");
+        el.placementCard.classList.add("hidden");
+        return;
+      }
+
+      if (state.game.status === "waiting_setup") {
+        el.screenSetup.classList.remove("hidden");
+        renderSetupSummary();
+        renderSetupBoard();
+        return;
+      }
+
+      el.placementCard.classList.add("hidden");
+      el.screenGame.classList.remove("hidden");
+      renderGameSummary();
+      renderMyBoard();
+      renderEnemyBoard();
+    }
+
+    function renderSetupSummary() {
+      const playersHtml = (state.game.players || []).map(p => {
+        const me = p.player_id === state.playerId ? " (you)" : "";
+        return `<div class="pill">Player ${p.player_id}${me} • Ships Remaining: ${p.ships_remaining}</div>`;
+      }).join("");
+
+      el.setupSummary.innerHTML = `
+        <div class="pill waiting">Setup Phase</div>
+        <div class="pill">Game ${state.game.game_id}</div>
+        <div class="pill">${state.game.grid_size}x${state.game.grid_size}</div>
+        <div class="pill">Players Joined: ${state.game.active_players}</div>
+        <div style="margin-top:10px;"><strong>Your Player ID:</strong> ${state.playerId}</div>
+        <div><strong>Your Ships Placed:</strong> ${playerHasPlacedShips() ? "Yes" : "No"}</div>
+        <div style="margin-top:10px;">${playersHtml || "No players yet."}</div>
+      `;
+    }
+
+    function renderGameSummary() {
       const statusClass =
         state.game.status === "playing" ? "playing" :
         state.game.status === "finished" ? "finished" : "waiting";
 
-      const playersHtml = (state.game.players || [])
-        .map(p => `
-          <div class="pill">
-            Player ${p.player_id} • Ships Remaining: ${p.ships_remaining}
-          </div>
-        `)
-        .join("");
-
-      els.gameSummary.innerHTML = `
-        <div class="pill ${statusClass}">${state.game.status}</div>
-        <div class="pill">Game ID: ${state.game.game_id}</div>
-        <div class="pill">Grid: ${state.game.grid_size}x${state.game.grid_size}</div>
-        <div class="pill">Active Players: ${state.game.active_players}</div>
-        <div class="pill">Total Moves: ${state.game.total_moves}</div>
-        <div style="margin-top:10px;"><strong>Current Turn Player ID:</strong> ${state.game.current_turn_player_id ?? "N/A"}</div>
-        <div style="margin-top:10px;"><strong>Players</strong></div>
-        <div style="margin-top:8px;">${playersHtml || "No players yet."}</div>
-      `;
-    }
-
-    function renderBoards() {
-      renderMyBoard();
-      renderTargetBoard();
-    }
-
-    function renderMyBoard() {
-      const size = Number(state.gridSize) || 8;
-      const wrapper = document.createElement("div");
-      const board = document.createElement("div");
-      board.className = "board";
-      board.style.gridTemplateColumns = `repeat(${size + 1}, 34px)`;
-
-      const ships = new Set();
-      const hits = new Set();
-      const misses = new Set();
-
-      if (state.playerBoardData) {
-        (state.playerBoardData.ships || []).forEach(ship => {
-          (ship.coordinates || []).forEach(([r, c]) => ships.add(`${r},${c}`));
-        });
-        (state.playerBoardData.hits || []).forEach(([r, c]) => hits.add(`${r},${c}`));
-        (state.playerBoardData.misses || []).forEach(([r, c]) => misses.add(`${r},${c}`));
-      }
-
-      for (let r = -1; r < size; r++) {
-        for (let c = -1; c < size; c++) {
-          const cell = document.createElement("div");
-          cell.className = "cell";
-
-          if (r === -1 && c === -1) {
-            cell.classList.add("label");
-            cell.textContent = "";
-          } else if (r === -1) {
-            cell.classList.add("label");
-            cell.textContent = c;
-          } else if (c === -1) {
-            cell.classList.add("label");
-            cell.textContent = r;
-          } else {
-            const key = `${r},${c}`;
-            const selected = state.selectedShips.includes(key);
-
-            if (ships.has(key)) cell.classList.add("ship");
-            if (hits.has(key)) {
-              cell.classList.remove("ship");
-              cell.classList.add("hit");
-              cell.textContent = "X";
-            } else if (misses.has(key)) {
-              cell.classList.add("miss");
-              cell.textContent = "•";
-            } else if (selected) {
-              cell.classList.add("selected");
-              cell.textContent = "S";
-            }
-
-            cell.onclick = () => toggleShipSelection(r, c);
-          }
-
-          board.appendChild(cell);
-        }
-      }
-
-      wrapper.appendChild(board);
-      els.myBoard.innerHTML = "";
-      els.myBoard.appendChild(wrapper);
-    }
-
-    function renderTargetBoard() {
-      const size = Number(state.gridSize) || 8;
-      const wrapper = document.createElement("div");
-      const board = document.createElement("div");
-      board.className = "board";
-      board.style.gridTemplateColumns = `repeat(${size + 1}, 34px)`;
-
-      const hitsByUs = new Set();
-      const missesByUs = new Set();
-
-      if (state.playerId && state.gameMovesCache) {
-        state.gameMovesCache.forEach(move => {
-          if (move.player_id === state.playerId) {
-            const key = `${move.row},${move.col}`;
-            if (move.result === "hit") hitsByUs.add(key);
-            else missesByUs.add(key);
-          }
-        });
-      }
-
       const isMyTurn =
-        state.game &&
         state.game.status === "playing" &&
         state.game.current_turn_player_id === state.playerId;
 
-      for (let r = -1; r < size; r++) {
-        for (let c = -1; c < size; c++) {
-          const cell = document.createElement("div");
-          cell.className = "cell";
+      const playersHtml = (state.game.players || []).map(p => {
+        const me = p.player_id === state.playerId ? " (you)" : "";
+        return `<div class="pill">Player ${p.player_id}${me} • Ships Remaining: ${p.ships_remaining}</div>`;
+      }).join("");
 
-          if (r === -1 && c === -1) {
-            cell.classList.add("label");
-            cell.textContent = "";
-          } else if (r === -1) {
-            cell.classList.add("label");
-            cell.textContent = c;
-          } else if (c === -1) {
-            cell.classList.add("label");
-            cell.textContent = r;
-          } else {
-            const key = `${r},${c}`;
-
-            if (hitsByUs.has(key)) {
-              cell.classList.add("hit");
-              cell.textContent = "X";
-            } else if (missesByUs.has(key)) {
-              cell.classList.add("miss");
-              cell.textContent = "•";
-            }
-
-            const alreadyFired = hitsByUs.has(key) || missesByUs.has(key);
-            if (!isMyTurn || alreadyFired) {
-              cell.classList.add("disabled");
-            } else {
-              cell.onclick = () => fireAt(r, c);
-            }
-          }
-
-          board.appendChild(cell);
-        }
+      let statusLine = "Waiting";
+      if (state.game.status === "playing") {
+        statusLine = isMyTurn ? "Your turn" : "Opponent's turn";
+      } else if (state.game.status === "finished") {
+        statusLine = "Match finished";
       }
 
-      wrapper.appendChild(board);
-      els.targetBoard.innerHTML = "";
-      els.targetBoard.appendChild(wrapper);
+      el.gameSummary.innerHTML = `
+        <div class="pill ${statusClass}">${state.game.status}</div>
+        <div class="pill">Game ${state.game.game_id}</div>
+        <div class="pill">${state.game.grid_size}x${state.game.grid_size}</div>
+        <div class="pill">Moves: ${state.game.total_moves}</div>
+        <div style="margin-top:10px;"><strong>Your Player ID:</strong> ${state.playerId}</div>
+        <div><strong>Current Turn:</strong> ${state.game.current_turn_player_id ?? "None"}</div>
+        <div><strong>Status:</strong> ${statusLine}</div>
+        <div style="margin-top:10px;">${playersHtml || "No players found."}</div>
+      `;
     }
 
-    function toggleShipSelection(row, col) {
-      if (state.game && state.game.status !== "waiting_setup") {
+    function renderMoves() {
+      if (!state.moves.length) {
+        el.moves.innerHTML = `<div class="move">No moves yet.</div>`;
+        return;
+      }
+
+      el.moves.innerHTML = state.moves.map(move => `
+        <div class="move">
+          <strong>#${move.move_number}</strong> —
+          Player ${move.player_id}${move.player_id === state.playerId ? " (you)" : ""}
+          fired at (${move.row}, ${move.col}) → <strong>${move.result}</strong><br>
+          <span class="small">${move.timestamp}</span>
+        </div>
+      `).join("");
+    }
+
+    function toggleShipCell(r, c) {
+      if (!state.game || state.game.status !== "waiting_setup") {
         log("You can only select ships during setup.", true);
         return;
       }
 
-      const key = `${row},${col}`;
+      if (playerHasPlacedShips()) {
+        log("You already placed your ships.", true);
+        return;
+      }
+
+      const key = `${r},${c}`;
 
       if (state.selectedShips.includes(key)) {
         state.selectedShips = state.selectedShips.filter(x => x !== key);
       } else {
         if (state.selectedShips.length >= 3) {
-          log("You can only select exactly 3 ship cells.", true);
+          log("You must select exactly 3 cells.", true);
           return;
         }
         state.selectedShips.push(key);
       }
 
-      updateSelectedShipsUI();
-      renderMyBoard();
-    }
-
-    function clearShipSelection() {
-      state.selectedShips = [];
-      updateSelectedShipsUI();
-      renderMyBoard();
-      log("Cleared ship selection.");
-    }
-
-    function updateSelectedShipsUI() {
-      els.selectedShipCount.textContent = state.selectedShips.length;
-      els.selectedShipCells.textContent = state.selectedShips.length
-        ? state.selectedShips.join(" | ")
-        : "None";
+      updateSelectionUI();
+      renderSetupBoard();
     }
 
     async function placeShips() {
       if (!state.playerId || !state.gameId) {
-        log("Create/join a game first.", true);
+        log("You need a player and a match first.", true);
         return;
       }
 
       if (state.selectedShips.length !== 3) {
-        log("Select exactly 3 ship cells first.", true);
+        log("Select exactly 3 cells first.", true);
         return;
       }
 
-      const ships = state.selectedShips.map(key => {
-        const [row, col] = key.split(",").map(Number);
+      const ships = state.selectedShips.map(k => {
+        const [row, col] = k.split(",").map(Number);
         return { row, col };
       });
 
       try {
-        await apiRequest(`/api/games/${state.gameId}/place`, {
+        await api(`/api/games/${state.gameId}/place`, {
           method: "POST",
           body: {
             player_id: state.playerId,
@@ -965,35 +978,45 @@
           }
         });
 
-        log(`Placed ships for player ${state.playerId} in game ${state.gameId}.`);
         state.selectedShips = [];
-        updateSelectedShipsUI();
+        updateSelectionUI();
+        log("Ships placed successfully.");
         await refreshGame();
       } catch (err) {
         log(`Place ships failed: ${err.message}`, true);
       }
     }
 
-    async function fireAt(row, col) {
-      if (!state.playerId || !state.gameId) {
-        log("Join a game first.", true);
+    async function fireAt(r, c) {
+      if (!state.game || !state.gameId || !state.playerId) {
+        log("Join a match first.", true);
+        return;
+      }
+
+      if (state.game.status !== "playing") {
+        log("The match is not in playing state yet.", true);
+        return;
+      }
+
+      if (state.game.current_turn_player_id !== state.playerId) {
+        log("It is not your turn.", true);
         return;
       }
 
       try {
-        const data = await apiRequest(`/api/games/${state.gameId}/fire`, {
+        const data = await api(`/api/games/${state.gameId}/fire`, {
           method: "POST",
           body: {
             player_id: state.playerId,
-            row,
-            col
+            row: r,
+            col: c
           }
         });
 
-        log(`Fired at (${row}, ${col}) → ${data.result}.`);
+        log(`Fired at (${r}, ${c}) → ${data.result}.`);
 
         if (data.winner_id) {
-          log(`Game finished. Winner: Player ${data.winner_id}.`);
+          log(`Match finished. Winner: Player ${data.winner_id}.`);
         } else if (data.next_player_id) {
           log(`Next turn: Player ${data.next_player_id}.`);
         }
@@ -1004,47 +1027,189 @@
       }
     }
 
-    async function loadMoves() {
-      if (!state.gameId) {
-        els.moveList.innerHTML = "";
-        return;
+    function getIncomingShotSets() {
+      const hits = new Set();
+      const misses = new Set();
+
+      if (state.boardData) {
+        (state.boardData.hits || []).forEach(([r, c]) => hits.add(`${r},${c}`));
+        (state.boardData.misses || []).forEach(([r, c]) => misses.add(`${r},${c}`));
       }
 
-      try {
-        const data = await apiRequest(`/api/games/${state.gameId}/moves`);
-        state.gameMovesCache = data.moves || [];
+      return { hits, misses };
+    }
 
-        if (!data.moves || data.moves.length === 0) {
-          els.moveList.innerHTML = `<div class="move-item">No moves yet.</div>`;
-        } else {
-          els.moveList.innerHTML = data.moves.map(move => `
-            <div class="move-item">
-              <strong>#${move.move_number}</strong> —
-              Player ${move.player_id}
-              fired at (${move.row}, ${move.col})
-              → <strong>${move.result}</strong><br>
-              <span class="small">${move.timestamp}</span>
-            </div>
-          `).join("");
+    function getOutgoingShotSets() {
+      const hits = new Set();
+      const misses = new Set();
+
+      state.moves.forEach(move => {
+        if (move.player_id === state.playerId) {
+          const key = `${move.row},${move.col}`;
+          if (move.result === "hit") hits.add(key);
+          else misses.add(key);
         }
+      });
 
-        renderTargetBoard();
-      } catch (err) {
-        log(`Load moves failed: ${err.message}`, true);
+      return { hits, misses };
+    }
+
+    function buildBoard(size, clickHandler, options = {}) {
+      const board = document.createElement("div");
+      board.className = "board";
+      board.style.gridTemplateColumns = `repeat(${size + 1}, 34px)`;
+
+      for (let r = -1; r < size; r++) {
+        for (let c = -1; c < size; c++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+
+          if (r === -1 && c === -1) {
+            cell.classList.add("label");
+          } else if (r === -1) {
+            cell.classList.add("label");
+            cell.textContent = c;
+          } else if (c === -1) {
+            cell.classList.add("label");
+            cell.textContent = r;
+          } else {
+            options.decorate?.(cell, r, c);
+
+            if (clickHandler && !cell.classList.contains("disabled")) {
+              cell.classList.add("clickable");
+              cell.onclick = () => clickHandler(r, c);
+            }
+          }
+
+          board.appendChild(cell);
+        }
       }
+
+      return board;
+    }
+
+    function renderSetupBoard() {
+      const size = state.gridSize || 8;
+      const placedShipSet = new Set();
+
+      if (state.boardData) {
+        (state.boardData.ships || []).forEach(ship => {
+          (ship.coordinates || []).forEach(([r, c]) => placedShipSet.add(`${r},${c}`));
+        });
+      }
+
+      const board = buildBoard(size, (!playerHasPlacedShips() ? toggleShipCell : null), {
+        decorate(cell, r, c) {
+          const key = `${r},${c}`;
+          const selected = state.selectedShips.includes(key);
+
+          if (placedShipSet.has(key)) {
+            cell.classList.add("ship");
+          } else if (selected) {
+            cell.classList.add("selected");
+            cell.textContent = "S";
+          }
+
+          if (playerHasPlacedShips()) {
+            cell.classList.add("disabled");
+          }
+        }
+      });
+
+      el.myBoardWrapSetup.innerHTML = "";
+      el.myBoardWrapSetup.appendChild(board);
+    }
+
+    function renderMyBoard() {
+      const size = state.gridSize || 8;
+      const shipSet = new Set();
+      const { hits, misses } = getIncomingShotSets();
+
+      if (state.boardData) {
+        (state.boardData.ships || []).forEach(ship => {
+          (ship.coordinates || []).forEach(([r, c]) => shipSet.add(`${r},${c}`));
+        });
+      }
+
+      const board = buildBoard(size, null, {
+        decorate(cell, r, c) {
+          const key = `${r},${c}`;
+
+          if (shipSet.has(key)) cell.classList.add("ship");
+          if (hits.has(key)) {
+            cell.classList.remove("ship");
+            cell.classList.add("hit");
+            cell.textContent = "X";
+          } else if (misses.has(key)) {
+            cell.classList.add("miss");
+            cell.textContent = "•";
+          }
+
+          cell.classList.add("disabled");
+        }
+      });
+
+      el.myBoardWrap.innerHTML = "";
+      el.myBoardWrap.appendChild(board);
+    }
+
+    function renderEnemyBoard() {
+      const size = state.gridSize || 8;
+      const { hits, misses } = getOutgoingShotSets();
+
+      const myTurn =
+        state.game &&
+        state.game.status === "playing" &&
+        state.game.current_turn_player_id === state.playerId;
+
+      const board = buildBoard(size, myTurn ? fireAt : null, {
+        decorate(cell, r, c) {
+          const key = `${r},${c}`;
+          const alreadyFired = hits.has(key) || misses.has(key);
+
+          if (hits.has(key)) {
+            cell.classList.add("hit");
+            cell.textContent = "X";
+          } else if (misses.has(key)) {
+            cell.classList.add("miss");
+            cell.textContent = "•";
+          }
+
+          if (!myTurn || alreadyFired) {
+            cell.classList.add("disabled");
+          }
+        }
+      });
+
+      el.enemyBoardWrap.innerHTML = "";
+      el.enemyBoardWrap.appendChild(board);
     }
 
     function startPolling() {
-      if (state.pollHandle) clearInterval(state.pollHandle);
+      if (state.pollId) clearInterval(state.pollId);
 
-      state.pollHandle = setInterval(async () => {
-        if (!state.gameId) return;
-        try {
-          await refreshGame();
-        } catch (_) {
-          // refreshGame already logs on failure
-        }
-      }, 5000);
+      state.pollId = setInterval(() => {
+        if (state.gameId) refreshGame();
+      }, 4000);
+    }
+
+    function init() {
+      el.apiBase.value = state.apiBase;
+      el.username.value = state.username;
+      el.playerIdView.textContent = state.playerId ?? "None";
+      el.playerNameView.textContent = state.username || "None";
+      el.gridSize.value = state.gridSize || 8;
+      el.currentGameId.textContent = state.gameId ?? "None";
+      if (state.gameId) el.gameIdInput.value = state.gameId;
+
+      updateSelectionUI();
+      pingApi();
+      renderScreens();
+
+      if (state.playerId) loadStats();
+      if (state.gameId) refreshGame();
+
+      startPolling();
     }
 
     init();
