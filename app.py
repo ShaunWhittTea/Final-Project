@@ -251,13 +251,6 @@ def surviving_players(cur, game_id):
     return survivors
 
 
-def valid_target_player_ids(cur, game_id, attacker_player_id):
-    return [
-        pid for pid in active_player_ids(cur, game_id)
-        if pid != attacker_player_id and ships_remaining_for_player(cur, game_id, pid) > 0
-    ]
-
-
 def current_turn_player_id(cur, game_id):
     cur.execute(
         """
@@ -962,8 +955,6 @@ def fire(game_id):
 
     if not is_valid_int_id(player_id):
         return error_response("bad_request", "player_id is required", 400)
-    if target_player_id is not None and not is_valid_int_id(target_player_id):
-        return error_response("bad_request", "target_player_id must be a positive integer", 400)
     if not isinstance(row, int) or not isinstance(col, int):
         return error_response("bad_request", "row and col are required", 400)
 
@@ -993,17 +984,27 @@ def fire(game_id):
                 if membership["turn_order"] != game["current_turn_index"]:
                     return error_response("forbidden", "Not your turn", 403)
 
-                allowed_targets = valid_target_player_ids(cur, game_id, player_id)
-                if not allowed_targets:
-                    return error_response("bad_request", "No valid targets remain", 400)
+                opponents = []
+                for row_player in get_turn_order_rows(cur, game_id):
+                    other_id = row_player["player_id"]
+                    if other_id == player_id:
+                        continue
+                    if ships_remaining_for_player(cur, game_id, other_id) > 0:
+                        opponents.append(other_id)
+
+                if not opponents:
+                    return error_response("bad_request", "No valid target players remain", 400)
 
                 if target_player_id is None:
-                    if len(allowed_targets) == 1:
-                        target_player_id = allowed_targets[0]
+                    if len(opponents) == 1:
+                        target_player_id = opponents[0]
                     else:
-                        return error_response("bad_request", "target_player_id is required", 400)
-                elif target_player_id not in allowed_targets:
-                    return error_response("bad_request", "Invalid target_player_id", 400)
+                        return error_response("bad_request", "target_player_id is required for multi-opponent games", 400)
+                else:
+                    if target_player_id == player_id:
+                        return error_response("bad_request", "Cannot target yourself", 400)
+                    if target_player_id not in opponents:
+                        return error_response("bad_request", "Invalid target_player_id", 400)
 
                 cur.execute(
                     """
@@ -1021,7 +1022,6 @@ def fire(game_id):
                 if cur.fetchone():
                     return error_response("conflict", "Cell already fired upon for this target", 409)
 
-                result = "miss"
                 cur.execute(
                     """
                     SELECT 1
@@ -1030,11 +1030,11 @@ def fire(game_id):
                       AND player_id = %s
                       AND row_index = %s
                       AND col_index = %s
+                    LIMIT 1
                     """,
                     (game_id, target_player_id, row, col)
                 )
-                if cur.fetchone():
-                    result = "hit"
+                result = "hit" if cur.fetchone() else "miss"
 
                 cur.execute(
                     """
