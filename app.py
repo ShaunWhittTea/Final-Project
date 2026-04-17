@@ -973,18 +973,6 @@ def fire(game_id):
                 if row < 0 or row >= game["grid_size"] or col < 0 or col >= game["grid_size"]:
                     return error_response("bad_request", "Shot out of bounds", 400)
 
-                cur.execute(
-                    """
-                    SELECT 1
-                    FROM shots
-                    WHERE game_id = %s AND row_index = %s AND col_index = %s
-                    LIMIT 1
-                    """,
-                    (game_id, row, col)
-                )
-                if cur.fetchone():
-                    return error_response("conflict", "Cell already fired upon", 409)
-
                 if game["status"] == FINISHED_STATUS:
                     return error_response("bad_request", "Game already finished", 400)
 
@@ -998,32 +986,49 @@ def fire(game_id):
                 result = "miss"
                 turn_rows = get_turn_order_rows(cur, game_id)
 
+                # First determine which opponent board this shot is aimed at.
+                # In a 2-player game, this is simply the other player.
                 for row_player in turn_rows:
                     other_id = row_player["player_id"]
-                    if other_id == player_id:
-                        continue
-
-                    cur.execute(
-                        """
-                        SELECT 1
-                        FROM ships
-                        WHERE game_id = %s
-                          AND player_id = %s
-                          AND row_index = %s
-                          AND col_index = %s
-                        """,
-                        (game_id, other_id, row, col)
-                    )
-                    if cur.fetchone():
+                    if other_id != player_id:
                         target_player_id = other_id
-                        result = "hit"
                         break
 
                 if target_player_id is None:
-                    for row_player in turn_rows:
-                        if row_player["player_id"] != player_id:
-                            target_player_id = row_player["player_id"]
-                            break
+                    return error_response("bad_request", "No valid target player found", 400)
+
+                # Now check if THIS attacker already fired at THIS target player's board cell.
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM shots
+                    WHERE game_id = %s
+                      AND attacker_player_id = %s
+                      AND target_player_id = %s
+                      AND row_index = %s
+                      AND col_index = %s
+                    LIMIT 1
+                    """,
+                    (game_id, player_id, target_player_id, row, col)
+                )
+                if cur.fetchone():
+                    return error_response("conflict", "You already fired at that cell on this opponent's board", 409)
+
+                # Determine hit or miss against the chosen target player's board only.
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM ships
+                    WHERE game_id = %s
+                      AND player_id = %s
+                      AND row_index = %s
+                      AND col_index = %s
+                    LIMIT 1
+                    """,
+                    (game_id, target_player_id, row, col)
+                )
+                if cur.fetchone():
+                    result = "hit"
 
                 cur.execute(
                     """
@@ -1100,12 +1105,14 @@ def fire(game_id):
             "result": result,
             "next_player_id": next_player_id,
             "game_status": game_status,
+            "target_player_id": target_player_id,
         }
         if winner_id is not None:
             response["winner_id"] = winner_id
         return jsonify(response), 200
+
     except UniqueViolation:
-        return error_response("conflict", "Cell already fired upon", 409)
+        return error_response("conflict", "You already fired at that cell on this opponent's board", 409)
     except Exception as ex:
         print(f"Fire error: {ex}")
         return error_response("internal_error", "Failed to fire", 500)
