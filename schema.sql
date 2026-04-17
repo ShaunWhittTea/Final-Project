@@ -94,4 +94,4 @@ ALTER TABLE shots
 
 ALTER TABLE shots
     ADD CONSTRAINT unique_shot_per_game_cell
-        UNIQUE (game_id, row_index, col_index);
+        UNIQUE (game_id, target_player_id, row_index, col_index);
