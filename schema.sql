@@ -93,8 +93,5 @@ ALTER TABLE shots
     DROP CONSTRAINT IF EXISTS unique_shot_per_game_cell;
 
 ALTER TABLE shots
-    DROP CONSTRAINT IF EXISTS unique_shot_per_attacker_target_cell;
-
-ALTER TABLE shots
-    ADD CONSTRAINT unique_shot_per_attacker_target_cell
-        UNIQUE (game_id, attacker_player_id, target_player_id, row_index, col_index);
+    ADD CONSTRAINT unique_shot_per_game_cell
+        UNIQUE (game_id, row_index, col_index);
