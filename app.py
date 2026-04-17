@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
 from psycopg.errors import UniqueViolation
@@ -486,6 +486,9 @@ try:
 except Exception as ex:
     print(f"DB init/startup reset failed: {ex}")
 
+@app.get("/")
+def serve_frontend():
+    return send_from_directory("frontend", "index.html")
 
 @app.before_request
 def guard_test_routes_and_lazy_reset():
@@ -947,10 +950,6 @@ def fire(game_id):
 
     row = data.get("row")
     col = data.get("col")
-    target_player_id = data.get("target_player_id")
-    if target_player_id is None:
-        target_player_id = data.get("targetPlayerId")
-    target_player_id = resolve_player_id(target_player_id)
 
     if not is_valid_int_id(player_id):
         return error_response("bad_request", "player_id is required", 400)
@@ -974,6 +973,18 @@ def fire(game_id):
                 if row < 0 or row >= game["grid_size"] or col < 0 or col >= game["grid_size"]:
                     return error_response("bad_request", "Shot out of bounds", 400)
 
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM shots
+                    WHERE game_id = %s AND row_index = %s AND col_index = %s
+                    LIMIT 1
+                    """,
+                    (game_id, row, col)
+                )
+                if cur.fetchone():
+                    return error_response("conflict", "Cell already fired upon", 409)
+
                 if game["status"] == FINISHED_STATUS:
                     return error_response("bad_request", "Game already finished", 400)
 
@@ -983,52 +994,36 @@ def fire(game_id):
                 if membership["turn_order"] != game["current_turn_index"]:
                     return error_response("forbidden", "Not your turn", 403)
 
+                target_player_id = None
+                result = "miss"
                 turn_rows = get_turn_order_rows(cur, game_id)
-                opponent_ids = [row_player["player_id"] for row_player in turn_rows if row_player["player_id"] != player_id]
-                if not opponent_ids:
-                    return error_response("bad_request", "No valid targets in game", 400)
+
+                for row_player in turn_rows:
+                    other_id = row_player["player_id"]
+                    if other_id == player_id:
+                        continue
+
+                    cur.execute(
+                        """
+                        SELECT 1
+                        FROM ships
+                        WHERE game_id = %s
+                          AND player_id = %s
+                          AND row_index = %s
+                          AND col_index = %s
+                        """,
+                        (game_id, other_id, row, col)
+                    )
+                    if cur.fetchone():
+                        target_player_id = other_id
+                        result = "hit"
+                        break
 
                 if target_player_id is None:
-                    if len(opponent_ids) == 1:
-                        target_player_id = opponent_ids[0]
-                    else:
-                        return error_response("bad_request", "target_player_id is required for games with more than 2 players", 400)
-                else:
-                    if target_player_id == player_id:
-                        return error_response("bad_request", "Cannot target yourself", 400)
-                    if target_player_id not in opponent_ids:
-                        return error_response("bad_request", "target_player_id must be another player in the game", 400)
-
-                cur.execute(
-                    """
-                    SELECT 1
-                    FROM shots
-                    WHERE game_id = %s
-                      AND target_player_id = %s
-                      AND row_index = %s
-                      AND col_index = %s
-                    LIMIT 1
-                    """,
-                    (game_id, target_player_id, row, col)
-                )
-                if cur.fetchone():
-                    return error_response("conflict", "Cell already fired upon for that target", 409)
-
-                result = "miss"
-                cur.execute(
-                    """
-                    SELECT 1
-                    FROM ships
-                    WHERE game_id = %s
-                      AND player_id = %s
-                      AND row_index = %s
-                      AND col_index = %s
-                    LIMIT 1
-                    """,
-                    (game_id, target_player_id, row, col)
-                )
-                if cur.fetchone():
-                    result = "hit"
+                    for row_player in turn_rows:
+                        if row_player["player_id"] != player_id:
+                            target_player_id = row_player["player_id"]
+                            break
 
                 cur.execute(
                     """
@@ -1103,7 +1098,6 @@ def fire(game_id):
 
         response = {
             "result": result,
-            "target_player_id": target_player_id,
             "next_player_id": next_player_id,
             "game_status": game_status,
         }
@@ -1111,7 +1105,7 @@ def fire(game_id):
             response["winner_id"] = winner_id
         return jsonify(response), 200
     except UniqueViolation:
-        return error_response("conflict", "Cell already fired upon for that target", 409)
+        return error_response("conflict", "Cell already fired upon", 409)
     except Exception as ex:
         print(f"Fire error: {ex}")
         return error_response("internal_error", "Failed to fire", 500)
@@ -1138,7 +1132,7 @@ def get_moves(game_id):
 
                 cur.execute(
                     """
-                    SELECT attacker_player_id, target_player_id, row_index, col_index, result, created_at
+                    SELECT attacker_player_id, row_index, col_index, result, created_at
                     FROM shots
                     WHERE game_id = %s
                     ORDER BY created_at, shot_id
@@ -1153,7 +1147,6 @@ def get_moves(game_id):
                 {
                     "move_number": index,
                     "player_id": shot["attacker_player_id"],
-                    "target_player_id": shot["target_player_id"],
                     "row": shot["row_index"],
                     "col": shot["col_index"],
                     "result": shot["result"],
