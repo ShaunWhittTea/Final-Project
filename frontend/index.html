@@ -1,1 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Battleship Phase 2 Client</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #121b2e;
+      --panel-2: #18243d;
+      --line: #2a3a61;
+      --text: #e8eefc;
+      --muted: #9fb1d9;
+      --accent: #60a5fa;
+      --accent-2: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --miss: #334155;
+      --ship: #1d4ed8;
+      --sunk: #ef4444;
+      --empty: #0f172a;
+      --unknown: #111827;
+      --shadow: 0 18px 40px rgba(0,0,0,.25);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(180deg, #08101d 0%, #10192c 100%);
+      color: var(--text);
+    }
+    .app {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      min-height: 100vh;
+    }
+    .sidebar {
+      border-right: 1px solid var(--line);
+      background: rgba(10, 16, 30, 0.8);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+    }
+    .main {
+      padding: 24px;
+    }
+    .brand {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .brand h1 {
+      font-size: 28px;
+      margin: 0;
+    }
+    .brand small {
+      color: var(--muted);
+      display: block;
+      margin-top: 3px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #17233a;
+      color: var(--muted);
+      font-size: 12px;
+      border: 1px solid var(--line);
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(23,35,58,.95), rgba(17,27,46,.95));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      margin-bottom: 16px;
+    }
+    h2, h3, h4 { margin: 0 0 10px 0; }
+    .muted { color: var(--muted); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .row > * { flex: 1 1 0; min-width: 0; }
+    input, select, button {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #0f172a;
+      color: var(--text);
+      padding: 12px 13px;
+      font-size: 14px;
+    }
+    button {
+      background: linear-gradient(180deg, #2563eb, #1d4ed8);
+      border: none;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .12s ease, opacity .12s ease;
+    }
+    button:hover { transform: translateY(-1px); }
+    button.secondary { background: #1f2937; border: 1px solid var(--line); }
+    button.success { background: linear-gradient(180deg, #16a34a, #15803d); }
+    button.warn { background: linear-gradient(180deg, #d97706, #b45309); }
+    button.danger { background: linear-gradient(180deg, #dc2626, #b91c1c); }
+    button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+    .tiny { font-size: 12px; }
+    .stack { display: grid; gap: 10px; }
+    .games-list, .mygames-list { display: grid; gap: 10px; }
+    .game-item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(15, 23, 42, .85);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .game-item.active { outline: 2px solid var(--accent); }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #1e293b;
+      border: 1px solid var(--line);
+    }
+    .badge.waiting { color: #fbbf24; }
+    .badge.playing { color: #60a5fa; }
+    .badge.finished { color: #4ade80; }
+    .alert {
+      padding: 12px 14px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      border: 1px solid transparent;
+    }
+    .alert.info { background: rgba(37,99,235,.15); border-color: rgba(96,165,250,.35); }
+    .alert.success { background: rgba(34,197,94,.12); border-color: rgba(74,222,128,.35); }
+    .alert.error { background: rgba(239,68,68,.12); border-color: rgba(248,113,113,.35); }
+    .alert.warn { background: rgba(245,158,11,.12); border-color: rgba(251,191,36,.35); }
+    .hero {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .hero h2 { font-size: 24px; }
+    .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .stat {
+      background: rgba(15,23,42,.9);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+    }
+    .stat .value { font-size: 24px; font-weight: 800; }
+    .stat .label { color: var(--muted); font-size: 12px; }
+    .boards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    .board-card {
+      background: linear-gradient(180deg, rgba(19,31,53,.98), rgba(14,24,40,.98));
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+    }
+    .board-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .board-header h4 { margin: 0; font-size: 18px; }
+    .board-sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .grid {
+      display: grid;
+      gap: 4px;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+    }
+    .cell {
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 8px;
+      min-height: 26px;
+      background: var(--empty);
+      transition: transform .12s ease, box-shadow .12s ease, background .15s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .cell.clickable:hover {
+      transform: scale(1.03);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.14) inset;
+      cursor: pointer;
+    }
+    .cell.empty { background: #0f172a; }
+    .cell.unknown { background: #111827; }
+    .cell.ship { background: #1d4ed8; }
+    .cell.miss { background: #334155; }
+    .cell.sunk { background: #dc2626; }
+    .cell.selected {
+      box-shadow: 0 0 0 2px #fde68a inset;
+      background: #1e40af;
+    }
+    .cell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transform: scale(.2);
+      border-radius: inherit;
+      background: rgba(255,255,255,.18);
+    }
+    .cell.hit-flash::after {
+      animation: ripple .6s ease-out;
+    }
+    @keyframes ripple {
+      0% { opacity: .7; transform: scale(.15); }
+      100% { opacity: 0; transform: scale(1.5); }
+    }
+    .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+    .swatch { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+    .log {
+      max-height: 420px;
+      overflow: auto;
+      display: grid;
+      gap: 10px;
+    }
+    .move {
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(15,23,42,.86);
+    }
+    .move strong { display: block; margin-bottom: 5px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+    }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    .empty-state {
+      min-height: 320px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border: 1px dashed var(--line);
+      border-radius: 24px;
+      background: rgba(15,23,42,.5);
+      padding: 30px;
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    @media (max-width: 1050px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 640px) {
+      .stats-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div>
+          <h1>Battleship</h1>
+          <small>Phase 2 client</small>
+        </div>
+        <span class="pill" id="api-status">Checking server…</span>
+      </div>
 
+      <div id="sidebar-alert"></div>
+
+      <section class="card">
+        <h3>Server</h3>
+        <div class="stack">
+          <input id="server-url" placeholder="https://your-render-app.onrender.com" />
+          <button class="secondary" id="save-server-btn">Save server URL</button>
+          <div class="tiny muted">Use your live deployed server here for the demo.</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">
+          <h3>Player</h3>
+          <span class="badge" id="player-badge">Not registered</span>
+        </div>
+        <div class="stack">
+          <input id="username-input" maxlength="30" placeholder="Username (letters, numbers, underscores)" />
+          <button id="register-btn">Register Player</button>
+          <button class="secondary" id="forget-player-btn">Forget Saved Player</button>
+          <div class="tiny muted" id="player-summary">No player saved in this browser yet.</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Create Game</h3>
+        <div class="stack">
+          <div class="row">
+            <div>
+              <label class="tiny muted">Grid size</label>
+              <select id="grid-size-select"></select>
+            </div>
+            <div>
+              <label class="tiny muted">Max players</label>
+              <select id="max-players-select"></select>
+            </div>
+          </div>
+          <button id="create-game-btn">Create New Game</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">
+          <h3>Open Games</h3>
+          <button class="secondary" id="refresh-games-btn">Refresh</button>
+        </div>
+        <div class="games-list" id="open-games-list"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">
+          <h3>My Games</h3>
+          <span class="tiny muted">Multi-game ready</span>
+        </div>
+        <div class="mygames-list" id="my-games-list"></div>
+      </section>
+    </aside>
+
+    <main class="main">
+      <div id="main-alert"></div>
+      <div id="main-content"></div>
+    </main>
+  </div>
+
+  <script>
+    const state = {
+      serverUrl: localStorage.getItem('battleship_server_url') || window.location.origin,
+      player: JSON.parse(localStorage.getItem('battleship_player') || 'null'),
+      selectedGameId: Number(localStorage.getItem('battleship_selected_game') || 0) || null,
+      myGameIds: JSON.parse(localStorage.getItem('battleship_my_games') || '[]'),
+      openGames: [],
+      gameDetails: new Map(),
+      boardsByGame: new Map(),
+      movesByGame: new Map(),
+      stats: null,
+      leaderboard: [],
+      placementSelections: {},
+      lastShotKey: null,
+      pollingHandle: null,
+    };
+
+    const el = {
+      serverUrl: document.getElementById('server-url'),
+      saveServerBtn: document.getElementById('save-server-btn'),
+      apiStatus: document.getElementById('api-status'),
+      usernameInput: document.getElementById('username-input'),
+      registerBtn: document.getElementById('register-btn'),
+      forgetPlayerBtn: document.getElementById('forget-player-btn'),
+      playerBadge: document.getElementById('player-badge'),
+      playerSummary: document.getElementById('player-summary'),
+      gridSizeSelect: document.getElementById('grid-size-select'),
+      maxPlayersSelect: document.getElementById('max-players-select'),
+      createGameBtn: document.getElementById('create-game-btn'),
+      refreshGamesBtn: document.getElementById('refresh-games-btn'),
+      openGamesList: document.getElementById('open-games-list'),
+      myGamesList: document.getElementById('my-games-list'),
+      mainContent: document.getElementById('main-content'),
+      mainAlert: document.getElementById('main-alert'),
+      sidebarAlert: document.getElementById('sidebar-alert'),
+    };
+
+    function initSelects() {
+      for (let i = 5; i <= 15; i += 1) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = i + ' × ' + i;
+        if (i === 8) opt.selected = true;
+        el.gridSizeSelect.appendChild(opt);
+      }
+      for (let i = 2; i <= 10; i += 1) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = String(i);
+        if (i === 2) opt.selected = true;
+        el.maxPlayersSelect.appendChild(opt);
+      }
+    }
+
+    function normalizeBase(url) {
+      return (url || '').trim().replace(/\/+$/, '');
+    }
+
+    function setAlert(target, message, type = 'info') {
+      if (!message) {
+        target.innerHTML = '';
+        return;
+      }
+      target.innerHTML = `<div class="alert ${type}">${escapeHtml(message)}</div>`;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function playerInGame(gameId) {
+      return state.myGameIds.includes(Number(gameId));
+    }
+
+    function savePlayer(player) {
+      state.player = player;
+      localStorage.setItem('battleship_player', JSON.stringify(player));
+      renderSidebar();
+    }
+
+    function saveMyGames() {
+      localStorage.setItem('battleship_my_games', JSON.stringify([...new Set(state.myGameIds.map(Number))]));
+    }
+
+    function selectGame(gameId) {
+      state.selectedGameId = Number(gameId);
+      localStorage.setItem('battleship_selected_game', String(gameId));
+      renderSidebar();
+      renderMain();
+      refreshSelectedGame();
+    }
+
+    async function api(path, options = {}) {
+      const base = normalizeBase(state.serverUrl);
+      if (!base) throw new Error('Set your server URL first.');
+      const url = base + path;
+      let response;
+      try {
+        response = await fetch(url, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {}),
+          },
+          ...options,
+        });
+      } catch (err) {
+        throw new Error('Could not reach the server. Check the deployed URL and try again.');
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      const data = contentType.includes('application/json') ? await response.json() : await response.text();
+      if (!response.ok) {
+        const message = data?.message || data?.error || `Request failed with status ${response.status}`;
+        throw new Error(message);
+      }
+      return data;
+    }
+
+    async function checkApiHealth() {
+      try {
+        const data = await api('/api/health');
+        el.apiStatus.textContent = 'Server online';
+        el.apiStatus.style.color = '#86efac';
+        return data;
+      } catch (err) {
+        el.apiStatus.textContent = 'Server offline';
+        el.apiStatus.style.color = '#fca5a5';
+        throw err;
+      }
+    }
+
+    function renderSidebar() {
+      el.serverUrl.value = state.serverUrl;
+      if (state.player) {
+        el.playerBadge.textContent = state.player.username;
+        el.playerSummary.textContent = `Saved as ${state.player.username} (player #${state.player.player_id}). This browser will stay signed in.`;
+      } else {
+        el.playerBadge.textContent = 'Not registered';
+        el.playerSummary.textContent = 'No player saved in this browser yet.';
+      }
+
+      el.openGamesList.innerHTML = state.openGames.length ? state.openGames.map((game) => {
+        const selected = Number(game.game_id) === Number(state.selectedGameId) ? 'active' : '';
+        const mine = playerInGame(game.game_id) ? '<span class="badge playing">Joined</span>' : '';
+        return `
+          <div class="game-item ${selected}">
+            <div class="row" style="align-items:center;">
+              <div>
+                <strong>Game #${game.game_id}</strong>
+                <div class="tiny muted">Created ${formatTimestamp(game.created_at)}</div>
+              </div>
+              <div style="flex:0 0 auto; text-align:right;">${mine}</div>
+            </div>
+            <div class="meta-grid">
+              <div>Grid: <strong>${game.grid_size}×${game.grid_size}</strong></div>
+              <div>Players: <strong>${game.active_players}/${game.max_players}</strong></div>
+              <div>Status: <strong>${escapeHtml(game.status)}</strong></div>
+              <div>Turn idx: <strong>${game.current_turn_index}</strong></div>
+            </div>
+            <div class="row">
+              <button class="secondary" onclick="selectGame(${game.game_id})">View</button>
+              <button onclick="joinOpenGame(${game.game_id})">Join</button>
+            </div>
+          </div>
+        `;
+      }).join('') : '<div class="tiny muted">No open games right now.</div>';
+
+      el.myGamesList.innerHTML = state.myGameIds.length ? state.myGameIds.map((gameId) => {
+        const game = state.gameDetails.get(Number(gameId));
+        const boards = state.boardsByGame.get(Number(gameId));
+        const status = boards?.status || game?.status || 'saved';
+        const selected = Number(gameId) === Number(state.selectedGameId) ? 'active' : '';
+        const turnFlag = boards?.your_turn ? '<span class="badge playing">Your turn</span>' : '';
+        return `
+          <div class="game-item ${selected}">
+            <div class="row" style="align-items:center;">
+              <div>
+                <strong>Game #${gameId}</strong>
+                <div class="tiny muted">${escapeHtml(status)}</div>
+              </div>
+              <div style="flex:0 0 auto; text-align:right;">${turnFlag}</div>
+            </div>
+            <div class="row">
+              <button class="secondary" onclick="selectGame(${gameId})">Open</button>
+              <button class="secondary" onclick="forgetGame(${gameId})">Forget</button>
+            </div>
+          </div>
+        `;
+      }).join('') : '<div class="tiny muted">Join or create a game to track it here.</div>';
+    }
+
+    function getSelectedData() {
+      if (!state.selectedGameId) return null;
+      return {
+        game: state.gameDetails.get(Number(state.selectedGameId)) || null,
+        boards: state.boardsByGame.get(Number(state.selectedGameId)) || null,
+        moves: state.movesByGame.get(Number(state.selectedGameId)) || [],
+      };
+    }
+
+    function renderMain() {
+      const selected = getSelectedData();
+      if (!state.player) {
+        el.mainContent.innerHTML = `
+          <div class="empty-state">
+            <div>
+              <h2>Register a player to start</h2>
+              <p class="muted">Create your identity, browse the lobby, join an open game, place 3 ships, and start firing.</p>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (!state.selectedGameId) {
+        el.mainContent.innerHTML = renderDashboardOnly();
+        return;
+      }
+
+      const game = selected?.game;
+      const boards = selected?.boards;
+      const moves = selected?.moves || [];
+
+      if (!game && !boards) {
+        el.mainContent.innerHTML = `
+          ${renderDashboardOnly()}
+          <div class="card"><div class="muted">Loading game #${state.selectedGameId}…</div></div>
+        `;
+        return;
+      }
+
+      const effectiveGame = boards || game;
+      const waiting = effectiveGame?.status === 'waiting_setup';
+      const playing = effectiveGame?.status === 'playing';
+      const finished = effectiveGame?.status === 'finished';
+      const currentTurnName = boards?.boards?.find((b) => b.player_id === boards.current_turn_player_id)?.username || '—';
+      const winnerName = boards?.boards?.find((b) => b.player_id === boards.winner_id)?.username || (boards?.winner_id ? `Player #${boards.winner_id}` : '—');
+      const viewerBoard = boards?.boards?.find((b) => b.is_viewer);
+      const placementSelected = state.placementSelections[state.selectedGameId] || [];
+      const placementReady = placementSelected.length === 3;
+
+      const heroMessage = finished
+        ? `Winner: ${winnerName}`
+        : playing
+          ? (boards?.your_turn ? 'Your turn to fire.' : `${currentTurnName}'s turn.`)
+          : waiting
+            ? 'Setup phase — each player must place exactly 3 ships.'
+            : 'Game state loaded.';
+
+      const viewerStats = state.stats || { wins: 0, losses: 0, accuracy: 0, total_shots: 0, total_hits: 0 };
+
+      el.mainContent.innerHTML = `
+        <div class="hero">
+          <div>
+            <h2>Game #${state.selectedGameId}</h2>
+            <div class="muted">${escapeHtml(heroMessage)}</div>
+          </div>
+          <div class="hero-actions">
+            <span class="badge ${escapeHtml(effectiveGame.status)}">${escapeHtml(effectiveGame.status)}</span>
+            ${boards?.your_turn ? '<span class="badge playing">Your turn</span>' : ''}
+            ${viewerBoard?.eliminated ? '<span class="badge finished">Eliminated</span>' : ''}
+            <button class="secondary" onclick="refreshSelectedGame(true)">Refresh now</button>
+          </div>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom:16px;">
+          <div class="stat"><div class="value">${viewerStats.wins ?? 0}</div><div class="label">Wins</div></div>
+          <div class="stat"><div class="value">${viewerStats.losses ?? 0}</div><div class="label">Losses</div></div>
+          <div class="stat"><div class="value">${formatPercent(viewerStats.accuracy ?? 0)}</div><div class="label">Accuracy</div></div>
+          <div class="stat"><div class="value">${viewerStats.total_shots ?? viewerStats.shots ?? 0}</div><div class="label">Shots</div></div>
+          <div class="stat"><div class="value">${viewerStats.total_hits ?? viewerStats.hits ?? 0}</div><div class="label">Hits</div></div>
+        </div>
+
+        ${waiting ? `
+          <div class="card">
+            <div class="section-title">
+              <h3>Ship Placement</h3>
+              <span class="tiny muted">Click 3 cells on your own board, then submit.</span>
+            </div>
+            <div class="row" style="align-items:center;">
+              <div class="tiny muted">Selected cells: ${placementSelected.map(([r,c]) => `(${r}, ${c})`).join(', ') || 'none yet'}</div>
+              <div style="flex:0 0 240px;">
+                <button class="success" ${placementReady ? '' : 'disabled'} onclick="submitPlacement()">Place 3 Ships</button>
+              </div>
+              <div style="flex:0 0 180px;">
+                <button class="secondary" onclick="clearPlacement()">Clear Selection</button>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
+        ${boards ? renderBoardsSection(boards) : '<div class="card"><div class="muted">Board data unavailable.</div></div>'}
+
+        <div class="row" style="align-items:start; margin-top:16px;">
+          <div>
+            <div class="card">
+              <div class="section-title">
+                <h3>Move History</h3>
+                <span class="tiny muted">Newest information pulled from /moves</span>
+              </div>
+              <div class="log">
+                ${moves.length ? moves.map(renderMove).join('') : '<div class="tiny muted">No shots have been fired yet.</div>'}
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <div class="section-title">
+                <h3>Leaderboard</h3>
+                <button class="secondary" onclick="loadLeaderboard()">Refresh</button>
+              </div>
+              ${renderLeaderboardTable()}
+            </div>
+          </div>
+        </div>
+      `;
+
+      if (state.lastShotKey) {
+        const hitEl = document.querySelector(`[data-flash-key="${CSS.escape(state.lastShotKey)}"]`);
+        if (hitEl) hitEl.classList.add('hit-flash');
+        state.lastShotKey = null;
+      }
+    }
+
+    function renderDashboardOnly() {
+      return `
+        <div class="hero">
+          <div>
+            <h2>Welcome, ${escapeHtml(state.player.username)}</h2>
+            <div class="muted">Create a game, join any open lobby, and manage multiple matches from one client.</div>
+          </div>
+        </div>
+        <div class="row" style="align-items:start;">
+          <div class="card">
+            <h3>What this client covers</h3>
+            <div class="stack tiny muted">
+              <div>• Register and persist your player identity in localStorage</div>
+              <div>• Browse open games and join any available lobby</div>
+              <div>• Place ships on your own board before the game starts</div>
+              <div>• Fire only on your turn, against specific opponents</div>
+              <div>• See your board and all opponent boards in one view</div>
+              <div>• Track move history, timestamps, leaderboard, elimination, and winner</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Leaderboard</h3>
+            ${renderLeaderboardTable()}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderBoardsSection(boardsPayload) {
+      const gridSize = boardsPayload.grid_size;
+      const viewerId = state.player?.player_id;
+      const waiting = boardsPayload.status === 'waiting_setup';
+      const playing = boardsPayload.status === 'playing';
+      const finished = boardsPayload.status === 'finished';
+      const boardHtml = boardsPayload.boards.map((board) => {
+        const canPlace = waiting && board.is_viewer;
+        const canTarget = playing && boardsPayload.your_turn && !board.is_viewer && !board.eliminated;
+        const titleFlags = [
+          board.is_viewer ? 'You' : null,
+          board.is_current_turn ? 'Current turn' : null,
+          board.eliminated ? 'Eliminated' : null,
+          board.placed ? 'Placed' : 'Not placed',
+        ].filter(Boolean).join(' • ');
+
+        return `
+          <div class="board-card">
+            <div class="board-header">
+              <div>
+                <h4>${escapeHtml(board.username)} ${board.is_viewer ? '(You)' : ''}</h4>
+                <div class="board-sub">Turn ${board.turn_order + 1} • Ships remaining: ${board.ships_remaining} • ${escapeHtml(titleFlags)}</div>
+              </div>
+              ${canTarget ? `<button style="width:auto; padding:8px 10px;" class="warn" onclick="setAlert(el.mainAlert, 'Click a cell on ${escapeHtml(board.username)}\'s board to fire.', 'info')">Target</button>` : ''}
+            </div>
+            <div class="grid" style="grid-template-columns: repeat(${gridSize}, 1fr);">
+              ${board.grid.map((row, r) => row.map((cell, c) => {
+                const selected = canPlace && isPlacementSelected(state.selectedGameId, r, c);
+                const cellClass = selected ? 'selected' : cell;
+                const flashKey = `${state.selectedGameId}:${board.player_id}:${r}:${c}`;
+                const action = canPlace
+                  ? `onclick="togglePlacementCell(${r}, ${c})"`
+                  : canTarget && (cell === 'empty' || cell === 'unknown')
+                    ? `onclick="fireAt(${board.player_id}, ${r}, ${c})"`
+                    : '';
+                const clickable = (canPlace || (canTarget && (cell === 'empty' || cell === 'unknown'))) ? 'clickable' : '';
+                return `<div class="cell ${cellClass} ${clickable}" ${action} data-flash-key="${flashKey}" title="Row ${r}, Col ${c}"></div>`;
+              }).join('')).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="card">
+          <div class="section-title">
+            <h3>Boards</h3>
+            <span class="tiny muted">Blue = your ships, gray = miss, red = sunk/hit</span>
+          </div>
+          <div class="boards">${boardHtml}</div>
+          <div class="legend">
+            <span><i class="swatch" style="background:#1d4ed8"></i>Your ship</span>
+            <span><i class="swatch" style="background:#334155"></i>Miss</span>
+            <span><i class="swatch" style="background:#dc2626"></i>Sunk / hit</span>
+            <span><i class="swatch" style="background:#111827"></i>Unknown enemy cell</span>
+          </div>
+          ${finished ? `<div class="alert success" style="margin-top:12px;">Game over. Winner: ${escapeHtml(boardsPayload.boards.find((b) => b.player_id === boardsPayload.winner_id)?.username || 'Unknown')}</div>` : ''}
+          ${viewerId && boardsPayload.current_turn_player_id && !boardsPayload.your_turn && !finished ? `<div class="alert info" style="margin-top:12px;">Waiting for ${escapeHtml(boardsPayload.boards.find((b) => b.player_id === boardsPayload.current_turn_player_id)?.username || 'another player')} to move.</div>` : ''}
+        </div>
+      `;
+    }
+
+    function renderMove(move) {
+      const attacker = resolvePlayerName(move.player_id);
+      const target = resolvePlayerName(move.target_player_id);
+      return `
+        <div class="move">
+          <strong>#${move.move_number} — ${escapeHtml(attacker)} → ${escapeHtml(target)}</strong>
+          <div class="muted">Cell (${move.row}, ${move.col}) • ${escapeHtml(move.result.toUpperCase())}</div>
+          <div class="tiny muted">${formatTimestamp(move.timestamp)}</div>
+        </div>
+      `;
+    }
+
+    function renderLeaderboardTable() {
+      if (!state.leaderboard.length) {
+        return '<div class="tiny muted">No leaderboard data yet.</div>';
+      }
+      return `
+        <table>
+          <thead>
+            <tr><th>Player</th><th>Wins</th><th>Losses</th><th>Accuracy</th></tr>
+          </thead>
+          <tbody>
+            ${state.leaderboard.map((row) => `
+              <tr>
+                <td>${escapeHtml(row.username)}${state.player && row.player_id === state.player.player_id ? ' (You)' : ''}</td>
+                <td>${row.wins}</td>
+                <td>${row.losses}</td>
+                <td>${formatPercent(row.accuracy)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function resolvePlayerName(playerId) {
+      for (const payload of state.boardsByGame.values()) {
+        const match = payload?.boards?.find((board) => Number(board.player_id) === Number(playerId));
+        if (match) return match.username;
+      }
+      if (state.player && Number(state.player.player_id) === Number(playerId)) return state.player.username;
+      return `Player #${playerId}`;
+    }
+
+    function formatTimestamp(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return date.toLocaleString();
+    }
+
+    function formatPercent(num) {
+      const value = Number(num || 0) * 100;
+      return `${value.toFixed(1)}%`;
+    }
+
+    function isPlacementSelected(gameId, row, col) {
+      const picks = state.placementSelections[gameId] || [];
+      return picks.some(([r, c]) => r === row && c === col);
+    }
+
+    window.togglePlacementCell = function togglePlacementCell(row, col) {
+      const gameId = state.selectedGameId;
+      if (!gameId) return;
+      const current = [...(state.placementSelections[gameId] || [])];
+      const foundIndex = current.findIndex(([r, c]) => r === row && c === col);
+      if (foundIndex >= 0) {
+        current.splice(foundIndex, 1);
+      } else {
+        if (current.length >= 3) {
+          setAlert(el.mainAlert, 'You can only place exactly 3 ships. Clear one first or submit this set.', 'warn');
+          return;
+        }
+        current.push([row, col]);
+      }
+      state.placementSelections[gameId] = current;
+      renderMain();
+    };
+
+    window.clearPlacement = function clearPlacement() {
+      if (!state.selectedGameId) return;
+      state.placementSelections[state.selectedGameId] = [];
+      renderMain();
+    };
+
+    async function registerPlayer() {
+      const username = el.usernameInput.value.trim();
+      if (!username) {
+        setAlert(el.sidebarAlert, 'Enter a username first.', 'warn');
+        return;
+      }
+      try {
+        const data = await api('/api/players', {
+          method: 'POST',
+          body: JSON.stringify({ username }),
+        });
+        savePlayer(data);
+        setAlert(el.sidebarAlert, `Registered ${data.username} successfully.`, 'success');
+        el.usernameInput.value = '';
+        await Promise.all([loadOpenGames(), loadPlayerStats(), loadLeaderboard()]);
+        renderMain();
+      } catch (err) {
+        setAlert(el.sidebarAlert, err.message, 'error');
+      }
+    }
+
+    async function createGame() {
+      if (!state.player) {
+        setAlert(el.sidebarAlert, 'Register a player before creating a game.', 'warn');
+        return;
+      }
+      try {
+        const data = await api('/api/games', {
+          method: 'POST',
+          body: JSON.stringify({
+            creator_id: state.player.player_id,
+            grid_size: Number(el.gridSizeSelect.value),
+            max_players: Number(el.maxPlayersSelect.value),
+          }),
+        });
+        if (!state.myGameIds.includes(data.game_id)) {
+          state.myGameIds.unshift(Number(data.game_id));
+          saveMyGames();
+        }
+        state.placementSelections[data.game_id] = [];
+        setAlert(el.sidebarAlert, `Created game #${data.game_id}. Share it or wait for others to join.`, 'success');
+        await loadOpenGames();
+        selectGame(data.game_id);
+      } catch (err) {
+        setAlert(el.sidebarAlert, err.message, 'error');
+      }
+    }
+
+    window.joinOpenGame = async function joinOpenGame(gameId) {
+      if (!state.player) {
+        setAlert(el.sidebarAlert, 'Register a player before joining a game.', 'warn');
+        return;
+      }
+      try {
+        await api(`/api/games/${gameId}/join`, {
+          method: 'POST',
+          body: JSON.stringify({ player_id: state.player.player_id }),
+        });
+        if (!state.myGameIds.includes(Number(gameId))) {
+          state.myGameIds.unshift(Number(gameId));
+          saveMyGames();
+        }
+        state.placementSelections[gameId] = state.placementSelections[gameId] || [];
+        setAlert(el.sidebarAlert, `Joined game #${gameId}.`, 'success');
+        await loadOpenGames();
+        selectGame(gameId);
+      } catch (err) {
+        setAlert(el.sidebarAlert, err.message, 'error');
+      }
+    };
+
+    window.forgetGame = function forgetGame(gameId) {
+      state.myGameIds = state.myGameIds.filter((id) => Number(id) !== Number(gameId));
+      saveMyGames();
+      if (Number(state.selectedGameId) === Number(gameId)) {
+        state.selectedGameId = state.myGameIds[0] || null;
+        if (state.selectedGameId) {
+          localStorage.setItem('battleship_selected_game', String(state.selectedGameId));
+        } else {
+          localStorage.removeItem('battleship_selected_game');
+        }
+      }
+      renderSidebar();
+      renderMain();
+    };
+
+    async function loadOpenGames() {
+      try {
+        const data = await api('/api/games');
+        state.openGames = Array.isArray(data.games) ? data.games : [];
+        renderSidebar();
+      } catch (err) {
+        setAlert(el.sidebarAlert, err.message, 'error');
+      }
+    }
+
+    async function loadPlayerStats() {
+      if (!state.player) return;
+      try {
+        state.stats = await api(`/api/players/${state.player.player_id}/stats`);
+        renderMain();
+      } catch (err) {
+        setAlert(el.mainAlert, err.message, 'error');
+      }
+    }
+
+    async function loadLeaderboard() {
+      try {
+        const data = await api('/api/leaderboard');
+        state.leaderboard = Array.isArray(data.players) ? data.players : [];
+        renderMain();
+      } catch (err) {
+        setAlert(el.mainAlert, err.message, 'error');
+      }
+    }
+    window.loadLeaderboard = loadLeaderboard;
+
+    async function loadGame(gameId) {
+      const data = await api(`/api/games/${gameId}`);
+      state.gameDetails.set(Number(gameId), data);
+      return data;
+    }
+
+    async function loadBoards(gameId) {
+      if (!state.player) return null;
+      const data = await api(`/api/games/${gameId}/boards?viewer_player_id=${state.player.player_id}`);
+      state.boardsByGame.set(Number(gameId), data);
+      return data;
+    }
+
+    async function loadMoves(gameId) {
+      const data = await api(`/api/games/${gameId}/moves`);
+      state.movesByGame.set(Number(gameId), Array.isArray(data.moves) ? data.moves.slice().reverse() : []);
+      return data;
+    }
+
+    async function refreshSelectedGame(showErrors = false) {
+      if (!state.selectedGameId || !state.player) {
+        renderMain();
+        return;
+      }
+      try {
+        await Promise.all([
+          loadGame(state.selectedGameId),
+          loadBoards(state.selectedGameId),
+          loadMoves(state.selectedGameId),
+          loadPlayerStats(),
+          loadLeaderboard(),
+        ]);
+        renderSidebar();
+        renderMain();
+      } catch (err) {
+        if (showErrors) setAlert(el.mainAlert, err.message, 'error');
+      }
+    }
+    window.refreshSelectedGame = refreshSelectedGame;
+
+    async function submitPlacement() {
+      const gameId = state.selectedGameId;
+      const picks = state.placementSelections[gameId] || [];
+      if (picks.length !== 3) {
+        setAlert(el.mainAlert, 'You must pick exactly 3 ship cells before submitting.', 'warn');
+        return;
+      }
+      try {
+        await api(`/api/games/${gameId}/place`, {
+          method: 'POST',
+          body: JSON.stringify({
+            player_id: state.player.player_id,
+            ships: picks.map(([row, col]) => [row, col]),
+          }),
+        });
+        state.placementSelections[gameId] = [];
+        setAlert(el.mainAlert, 'Ships placed successfully. Waiting for the rest of the lobby.', 'success');
+        await refreshSelectedGame();
+        await loadOpenGames();
+      } catch (err) {
+        setAlert(el.mainAlert, err.message, 'error');
+      }
+    }
+    window.submitPlacement = submitPlacement;
+
+    window.fireAt = async function fireAt(targetPlayerId, row, col) {
+      if (!state.selectedGameId || !state.player) return;
+      try {
+        const result = await api(`/api/games/${state.selectedGameId}/fire`, {
+          method: 'POST',
+          body: JSON.stringify({
+            player_id: state.player.player_id,
+            target_player_id: Number(targetPlayerId),
+            row: Number(row),
+            col: Number(col),
+          }),
+        });
+        state.lastShotKey = `${state.selectedGameId}:${targetPlayerId}:${row}:${col}`;
+        const summary = result.winner_id
+          ? `Direct hit. Game over — winner is ${resolvePlayerName(result.winner_id)}.`
+          : `Shot result: ${result.result.toUpperCase()}.`;
+        setAlert(el.mainAlert, summary, result.result === 'hit' ? 'success' : 'info');
+        await refreshSelectedGame();
+      } catch (err) {
+        setAlert(el.mainAlert, err.message, 'error');
+      }
+    };
+
+    function startPolling() {
+      if (state.pollingHandle) clearInterval(state.pollingHandle);
+      state.pollingHandle = setInterval(async () => {
+        await loadOpenGames();
+        if (state.player) {
+          await loadPlayerStats();
+          if (state.selectedGameId) await refreshSelectedGame();
+        }
+      }, 2500);
+    }
+
+    async function initialize() {
+      initSelects();
+      el.serverUrl.value = state.serverUrl;
+      renderSidebar();
+      renderMain();
+
+      try {
+        await checkApiHealth();
+      } catch (err) {
+        setAlert(el.sidebarAlert, err.message, 'error');
+      }
+
+      await loadOpenGames();
+      if (state.player) {
+        await Promise.all([loadPlayerStats(), loadLeaderboard()]);
+        if (state.selectedGameId) {
+          await refreshSelectedGame();
+        }
+      } else {
+        await loadLeaderboard();
+      }
+
+      startPolling();
+    }
+
+    el.saveServerBtn.addEventListener('click', async () => {
+      state.serverUrl = normalizeBase(el.serverUrl.value);
+      localStorage.setItem('battleship_server_url', state.serverUrl);
+      try {
+        await checkApiHealth();
+        setAlert(el.sidebarAlert, 'Server URL saved.', 'success');
+        await loadOpenGames();
+        await loadLeaderboard();
+        if (state.player) await loadPlayerStats();
+        if (state.selectedGameId) await refreshSelectedGame();
+      } catch (err) {
+        setAlert(el.sidebarAlert, err.message, 'error');
+      }
+    });
+
+    el.registerBtn.addEventListener('click', registerPlayer);
+    el.createGameBtn.addEventListener('click', createGame);
+    el.refreshGamesBtn.addEventListener('click', loadOpenGames);
+    el.forgetPlayerBtn.addEventListener('click', () => {
+      state.player = null;
+      state.stats = null;
+      localStorage.removeItem('battleship_player');
+      setAlert(el.sidebarAlert, 'Saved player removed from this browser.', 'success');
+      renderSidebar();
+      renderMain();
+    });
+
+    window.selectGame = selectGame;
+    initialize();
+  </script>
+</body>
+</html>
