@@ -6,17 +6,16 @@
   <title>Battleship</title>
   <style>
     :root{
-      --bg:#0f172a; --panel:#111827; --panel2:#1f2937; --border:#334155;
-      --text:#e5e7eb; --muted:#94a3b8; --accent:#38bdf8; --success:#22c55e;
-      --warning:#f59e0b; --danger:#ef4444; --water:#1e293b; --ship:#14532d;
-      --shipBorder:#22c55e; --hit:#7f1d1d; --miss:#334155;
+      --bg:#0f172a; --panel:#111827; --border:#334155; --text:#e5e7eb; --muted:#94a3b8;
+      --accent:#38bdf8; --success:#22c55e; --warning:#f59e0b; --danger:#ef4444;
+      --water:#1e293b; --ship:#14532d; --ship-border:#22c55e; --hit:#7f1d1d; --miss:#334155;
     }
     *{box-sizing:border-box}
     body{margin:0;font-family:Arial,Helvetica,sans-serif;background:linear-gradient(180deg,#020617,#0f172a);color:var(--text)}
-    .container{max-width:1400px;margin:0 auto;padding:24px}
+    .container{max-width:1380px;margin:0 auto;padding:24px}
     .hero,.card{background:rgba(17,24,39,.97);border:1px solid var(--border);border-radius:18px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
     .hero{padding:24px;margin-bottom:20px}
-    .hero h1{margin:0 0 8px 0}.hero p{margin:0;color:var(--muted);line-height:1.5}
+    .hero h1{margin:0 0 8px 0}.hero p{margin:0;color:var(--muted)}
     .layout{display:grid;grid-template-columns:360px 1fr;gap:20px}
     .left,.right{display:flex;flex-direction:column;gap:20px}
     .card{padding:18px}
@@ -28,10 +27,9 @@
     button.secondary{background:#334155;color:var(--text)}
     button.success{background:var(--success);color:#04120a}
     button.warning{background:var(--warning);color:#1f1300}
-    button.danger{background:var(--danger);color:#fff}
     button:disabled{opacity:.55;cursor:not-allowed}
     .row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
-    .status,.stat,.game-item,.move{background:#020617;border:1px solid var(--border);border-radius:12px;padding:12px}
+    .status,.game-item,.move{background:#020617;border:1px solid var(--border);border-radius:12px;padding:12px}
     .small,.meta{color:var(--muted);font-size:.88rem}
     .banner{border-radius:14px;padding:12px 14px;font-weight:700;margin-bottom:12px;border:1px solid var(--border)}
     .banner.wait{background:rgba(245,158,11,.14);color:#fde68a;border-color:#b45309}
@@ -46,18 +44,19 @@
     .stats,.boards-grid,.games-list,.moves{display:grid;gap:10px}
     .stats{grid-template-columns:repeat(3,1fr);margin-top:10px}
     .boards-grid{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
-    .games-list,.moves{max-height:340px;overflow:auto}
-    .stat{text-align:center}.stat b{display:block;margin-top:4px;font-size:1.25rem}
+    .games-list,.moves{max-height:320px;overflow:auto}
+    .stat{text-align:center;background:#020617;border:1px solid var(--border);border-radius:12px;padding:12px}
+    .stat b{display:block;margin-top:4px;font-size:1.3rem}
     .board{display:grid;gap:4px;justify-content:start;margin-top:12px}
     .cell{width:34px;height:34px;border-radius:8px;border:1px solid #475569;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:700;background:var(--water);user-select:none}
     .cell.label{background:transparent;border:none;color:var(--muted)}
     .cell.clickable{cursor:pointer}.cell.clickable:hover{border-color:var(--accent);transform:scale(1.03)}
-    .cell.ship{background:var(--ship);border-color:var(--shipBorder)}
+    .cell.ship{background:var(--ship);border-color:var(--ship-border)}
     .cell.hit{background:var(--hit);border-color:#ef4444;color:#fecaca}
     .cell.miss{background:var(--miss);border-color:#94a3b8;color:#cbd5e1}
     .cell.selected{outline:2px solid white;outline-offset:1px}
     .cell.disabled{opacity:.6;cursor:not-allowed}
-    .log{background:#020617;border:1px solid var(--border);border-radius:12px;padding:12px;max-height:250px;overflow:auto;white-space:pre-wrap;font-family:Consolas,monospace;font-size:.9rem;line-height:1.4}
+    .log{background:#020617;border:1px solid var(--border);border-radius:12px;padding:12px;max-height:240px;overflow:auto;white-space:pre-wrap;font-family:Consolas,monospace;font-size:.9rem;line-height:1.4}
     .hidden{display:none!important}
     @media (max-width:1100px){.layout{grid-template-columns:1fr}}
     @media (max-width:700px){.cell{width:28px;height:28px;font-size:.72rem}}
@@ -67,7 +66,7 @@
   <div class="container">
     <div class="hero">
       <h1>Battleship</h1>
-      <p>This client is built around the real routes in your repo. One browser is one player. Use the same deployed URL on different computers and join the same game ID.</p>
+      <p>Use the same deployed site URL on different computers. Each browser keeps its own player in sessionStorage.</p>
     </div>
 
     <div class="layout">
@@ -94,7 +93,6 @@
           <div class="status" style="margin-top:12px">
             <div><strong>Player ID:</strong> <span id="playerIdView">None</span></div>
             <div><strong>Username:</strong> <span id="playerNameView">None</span></div>
-            <div class="small" style="margin-top:8px">Saved per browser tab with <code>sessionStorage</code>.</div>
           </div>
           <div id="stats" class="stats"></div>
         </div>
@@ -113,7 +111,7 @@
           </div>
           <div class="row" style="margin-top:12px">
             <button class="success" onclick="createGame()">Create Match</button>
-            <button class="secondary" onclick="loadLobby()">Refresh Lobby</button>
+            <button class="secondary" onclick="loadOpenGames()">Refresh Lobby</button>
           </div>
           <div class="status" style="margin-top:12px">
             <div><strong>Current Game ID:</strong> <span id="currentGameId">None</span></div>
@@ -122,7 +120,7 @@
 
         <div class="card">
           <h2>Open Games</h2>
-          <div class="small">Your backend's <code>/api/games</code> is a stub, so this lobby scans real game IDs using <code>/api/games/&lt;id&gt;</code> and shows setup-phase matches it can actually find.</div>
+          <div class="small">Joinable games are loaded directly from <code>GET /api/games</code>.</div>
           <div id="gamesList" class="games-list" style="margin-top:12px">
             <div class="game-item">No games loaded yet.</div>
           </div>
@@ -172,7 +170,7 @@
             </div>
             <div class="card">
               <h3>Remote Play</h3>
-              <div class="small">For 2-player games, remote play works cleanly. In games above 2 players, your current backend always fires at the first non-self opponent in turn order, so the client shows all boards but cannot choose a true target board.</div>
+              <div class="small">Share the same site URL and game ID with the other player. They do not need your browser open locally.</div>
             </div>
           </div>
         </div>
@@ -192,7 +190,6 @@
 
   <script>
     const TEST_PASSWORD = "clemson-test-2026";
-    const LOBBY_SCAN_LIMIT = 40;
 
     const state = {
       apiBase: localStorage.getItem("bs_api_base") || window.location.origin,
@@ -201,8 +198,7 @@
       gameId: sessionStorage.getItem("bs_game_id") ? Number(sessionStorage.getItem("bs_game_id")) : null,
       gridSize: sessionStorage.getItem("bs_grid_size") ? Number(sessionStorage.getItem("bs_grid_size")) : 8,
       game: null,
-      myBoard: null,
-      opponentBoards: {},
+      boardData: null,
       moves: [],
       openGames: [],
       selectedShips: [],
@@ -274,15 +270,26 @@
       const url = `${state.apiBase}${path}`;
       const config = {
         method: options.method || "GET",
-        headers: {"Content-Type":"application/json", ...(options.headers || {})}
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) }
       };
       if (options.body !== undefined) config.body = JSON.stringify(options.body);
 
       const res = await fetch(url, config);
       let data = null;
       try { data = await res.json(); } catch (_) {}
-      if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+      }
       return data;
+    }
+
+    function normalizeGamesResponse(data) {
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.games)) return data.games;
+      if (Array.isArray(data?.items)) return data.items;
+      if (Array.isArray(data?.data)) return data.data;
+      return [];
     }
 
     function getPlayers() {
@@ -293,24 +300,25 @@
       return getPlayers().filter(p => Number(p.player_id) !== Number(state.playerId));
     }
 
+    function getGameMaxPlayers(game = state.game) {
+      return Number(game?.max_players ?? game?.maxPlayers ?? Number(el.maxPlayers.value) || 2);
+    }
+
     function playerHasPlacedShips() {
-      return Array.isArray(state.myBoard?.ships) && state.myBoard.ships.length >= 3;
+      return Array.isArray(state.boardData?.ships) && state.boardData.ships.length >= 3;
     }
 
     function isPlayerEliminated(player) {
       if (!state.game || state.game.status === "waiting_setup") return false;
+      if (player?.eliminated === true) return true;
       return Number(player?.ships_remaining ?? 1) <= 0;
     }
 
     function getWinnerId() {
       if (!state.game || state.game.status !== "finished") return null;
-      const alive = getPlayers().filter(p => Number(p.ships_remaining ?? 0) > 0);
+      if (state.game.winner_id != null) return state.game.winner_id;
+      const alive = getPlayers().filter(p => !isPlayerEliminated(p));
       return alive.length === 1 ? alive[0].player_id : null;
-    }
-
-    function getServerTargetPlayerId() {
-      const opponents = getOpponentPlayers().filter(p => !isPlayerEliminated(p));
-      return opponents.length ? Number(opponents[0].player_id) : null;
     }
 
     async function pingApi() {
@@ -334,7 +342,7 @@
       const username = el.username.value.trim();
       if (!username) return log("Enter a username first.", true);
       try {
-        const data = await api("/api/players", {method:"POST", body:{username}});
+        const data = await api("/api/players", { method: "POST", body: { username } });
         state.playerId = data.player_id;
         state.username = data.username;
         savePlayerSession();
@@ -342,7 +350,7 @@
         el.playerNameView.textContent = state.username;
         log(`Created player "${state.username}" with ID ${state.playerId}.`);
         await loadStats();
-        await loadLobby();
+        await loadOpenGames();
       } catch (err) {
         log(`Create player failed: ${err.message}`, true);
       }
@@ -369,23 +377,26 @@
       if (!state.playerId) return log("Create your player first.", true);
       try {
         const data = await api("/api/games", {
-          method:"POST",
-          body:{creator_id: state.playerId, grid_size: Number(el.gridSize.value), max_players: Number(el.maxPlayers.value)}
+          method: "POST",
+          body: {
+            creator_id: state.playerId,
+            grid_size: Number(el.gridSize.value),
+            max_players: Number(el.maxPlayers.value)
+          }
         });
         state.gameId = data.game_id;
         state.gridSize = data.grid_size;
         state.game = null;
-        state.myBoard = null;
-        state.opponentBoards = {};
+        state.boardData = null;
         state.moves = [];
         state.selectedShips = [];
         saveGameSession();
         el.currentGameId.textContent = state.gameId;
         el.gameIdInput.value = state.gameId;
         updateSelectionUI();
-        log(`Created match ${state.gameId}. Share this game ID with other players.`);
+        log(`Created match ${state.gameId}. Share this game ID with another player.`);
         await refreshGame();
-        await loadLobby();
+        await loadOpenGames();
       } catch (err) {
         log(`Create match failed: ${err.message}`, true);
       }
@@ -395,50 +406,52 @@
       if (!state.playerId) return log("Create your player first.", true);
       const gameId = Number(forcedGameId ?? el.gameIdInput.value);
       if (!gameId) return log("Enter a game ID to join.", true);
+
       try {
-        const data = await api(`/api/games/${gameId}/join`, {method:"POST", body:{player_id: state.playerId}});
+        const data = await api(`/api/games/${gameId}/join`, { method: "POST", body: { player_id: state.playerId } });
         state.gameId = data.game_id;
         saveGameSession();
         el.currentGameId.textContent = state.gameId;
         el.gameIdInput.value = state.gameId;
         log(`Joined match ${state.gameId} as player ${state.playerId}.`);
         await refreshGame();
-        await loadLobby();
+        await loadOpenGames();
       } catch (err) {
         log(`Join match failed: ${err.message}`, true);
       }
     }
 
-    async function scanGame(gameId) {
+    async function loadOpenGames() {
       try {
-        const game = await api(`/api/games/${gameId}`);
-        return game;
-      } catch (_) {
-        return null;
+        const data = await api("/api/games");
+        state.openGames = normalizeGamesResponse(data);
+        renderOpenGames();
+      } catch (err) {
+        el.gamesList.innerHTML = `<div class="game-item">Could not load games: ${err.message}</div>`;
       }
     }
 
-    async function loadLobby() {
-      const ids = Array.from({length: LOBBY_SCAN_LIMIT}, (_, i) => i + 1);
-      const results = await Promise.all(ids.map(scanGame));
-      state.openGames = results.filter(game => game && game.status === "waiting_setup").sort((a, b) => Number(b.game_id) - Number(a.game_id));
-      renderLobby();
-    }
-
-    function renderLobby() {
-      if (!state.openGames.length) {
-        el.gamesList.innerHTML = `<div class="game-item">No waiting games found in the first ${LOBBY_SCAN_LIMIT} game IDs.</div>`;
+    function renderOpenGames() {
+      const games = state.openGames;
+      if (!games.length) {
+        el.gamesList.innerHTML = `<div class="game-item">No open games right now.</div>`;
         return;
       }
-      el.gamesList.innerHTML = state.openGames.map(game => {
-        const mine = getPlayers().some(p => Number(p.player_id) === Number(state.playerId)) && Number(game.game_id) === Number(state.gameId);
+      el.gamesList.innerHTML = games.map(game => {
+        const gameId = game.game_id ?? game.id;
+        const status = game.status ?? "unknown";
+        const activePlayers = Number(game.active_players ?? game.player_count ?? 0);
+        const maxPlayers = Number(game.max_players ?? game.maxPlayers ?? 0);
+        const gridSize = game.grid_size ?? game.gridSize ?? "?";
+        const full = maxPlayers > 0 && activePlayers >= maxPlayers;
+        const disabled = !state.playerId || full || status === "finished";
         return `
           <div class="game-item">
-            <div><strong>Game ${game.game_id}</strong> <span class="pill waiting">${game.status}</span></div>
-            <div class="meta">Grid ${game.grid_size}x${game.grid_size} • Players ${game.active_players}</div>
+            <div><strong>Game ${gameId}</strong> <span class="pill ${status === 'playing' ? 'playing' : status === 'finished' ? 'finished' : 'waiting'}">${status}</span></div>
+            <div class="meta">Grid ${gridSize}x${gridSize} • Players ${activePlayers}/${maxPlayers || '?'}</div>
             <div class="row" style="margin-top:10px">
-              <button class="secondary" onclick="selectGameId(${game.game_id})">Select</button>
-              <button ${!state.playerId ? "disabled" : ""} onclick="joinGame(${game.game_id})">Join</button>
+              <button class="secondary" onclick="selectGameId(${gameId})">Select</button>
+              <button ${disabled ? "disabled" : ""} onclick="joinGame(${gameId})">Join</button>
             </div>
           </div>
         `;
@@ -451,16 +464,13 @@
     }
 
     async function refreshGame() {
-      if (!state.gameId) {
-        renderAll();
-        return;
-      }
+      if (!state.gameId) return renderAll();
       try {
         state.game = await api(`/api/games/${state.gameId}`);
         state.gridSize = state.game.grid_size;
         saveGameSession();
         el.currentGameId.textContent = state.gameId;
-        await loadBoards();
+        await loadBoard();
         await loadMoves();
         renderAll();
       } catch (err) {
@@ -468,29 +478,22 @@
       }
     }
 
-    async function loadBoards() {
+    async function loadBoard() {
       if (!state.gameId || !state.playerId) return;
       try {
-        state.myBoard = await api(`/api/test/games/${state.gameId}/board/${state.playerId}`, {headers:{"X-Test-Password":TEST_PASSWORD}});
+        state.boardData = await api(`/api/test/games/${state.gameId}/board/${state.playerId}`, {
+          headers: { "X-Test-Password": TEST_PASSWORD }
+        });
       } catch (err) {
-        state.myBoard = null;
+        state.boardData = null;
       }
-      const boards = {};
-      await Promise.all(getOpponentPlayers().map(async (p) => {
-        try {
-          boards[p.player_id] = await api(`/api/test/games/${state.gameId}/board/${p.player_id}`, {headers:{"X-Test-Password":TEST_PASSWORD}});
-        } catch (_) {
-          boards[p.player_id] = null;
-        }
-      }));
-      state.opponentBoards = boards;
     }
 
     async function loadMoves() {
       if (!state.gameId) return;
       try {
         const data = await api(`/api/games/${state.gameId}/moves`);
-        state.moves = Array.isArray(data?.moves) ? data.moves : [];
+        state.moves = Array.isArray(data?.moves) ? data.moves : Array.isArray(data) ? data : [];
         renderMoves();
       } catch (err) {
         log(`Move history failed: ${err.message}`, true);
@@ -503,7 +506,6 @@
       renderSetupBoard();
       renderGameSummary();
       renderBoards();
-      renderMoves();
     }
 
     function renderStatus() {
@@ -515,16 +517,21 @@
         el.placementCard.classList.remove("hidden");
         return;
       }
+
       if (state.game.status === "waiting_setup") {
-        el.statusBanner.className = "banner wait";
-        el.statusBanner.textContent = `Setup phase. ${state.game.active_players} player(s) joined.`;
+        const active = Number(state.game.active_players || 0);
+        const max = getGameMaxPlayers();
+        el.statusBanner.className = active < max ? "banner wait" : "banner hold";
+        el.statusBanner.textContent = active < max
+          ? `Waiting for more players to join. ${active}/${max} connected.`
+          : "All players joined. Waiting for ship placement.";
         el.setupCard.classList.remove("hidden");
         el.gameCard.classList.add("hidden");
         el.placementCard.classList.toggle("hidden", playerHasPlacedShips());
       } else if (state.game.status === "playing") {
         const myTurn = Number(state.game.current_turn_player_id) === Number(state.playerId);
         el.statusBanner.className = myTurn ? "banner turn" : "banner hold";
-        el.statusBanner.textContent = myTurn ? "Your turn." : `Waiting for Player ${state.game.current_turn_player_id}.`;
+        el.statusBanner.textContent = myTurn ? "Your turn. Fire on an opponent board." : `Waiting for Player ${state.game.current_turn_player_id}.`;
         el.setupCard.classList.add("hidden");
         el.gameCard.classList.remove("hidden");
         el.placementCard.classList.add("hidden");
@@ -545,8 +552,9 @@
       }
       const playersHtml = getPlayers().map(p => {
         const me = Number(p.player_id) === Number(state.playerId) ? " (you)" : "";
-        return `<div class="pill">Player ${p.player_id}${me}</div>`;
+        return `<div class="pill">Player ${p.player_id}${me} • ${p.ships_remaining ?? 0} ships shown</div>`;
       }).join("");
+
       el.setupSummary.innerHTML = `
         <div class="pill waiting">Setup Phase</div>
         <div class="pill">Game ${state.game.game_id}</div>
@@ -572,13 +580,14 @@
         const label = winner ? "Winner" : eliminated ? "Eliminated" : `${p.ships_remaining ?? 0} ships left`;
         return `<div class="pill ${cls}">Player ${p.player_id}${me} • ${label}</div>`;
       }).join("");
-      const currentTarget = getServerTargetPlayerId();
+
       let statusLine = "Waiting";
       if (state.game.status === "playing") {
         statusLine = Number(state.game.current_turn_player_id) === Number(state.playerId) ? "Your turn" : "Opponent's turn";
       } else if (state.game.status === "finished") {
         statusLine = winnerId != null ? `Winner: Player ${winnerId}` : "Match finished";
       }
+
       el.gameSummary.innerHTML = `
         <div class="pill ${statusClass}">${state.game.status}</div>
         <div class="pill">Game ${state.game.game_id}</div>
@@ -587,7 +596,6 @@
         <div style="margin-top:10px"><strong>Your Player ID:</strong> ${state.playerId ?? "None"}</div>
         <div><strong>Current Turn:</strong> ${state.game.current_turn_player_id ?? "None"}</div>
         <div><strong>Status:</strong> ${statusLine}</div>
-        <div><strong>Server Target Board:</strong> ${currentTarget != null ? `Player ${currentTarget}` : "None"}</div>
         <div style="margin-top:10px">${playersHtml || "No players found."}</div>
       `;
     }
@@ -599,9 +607,10 @@
       }
       el.moves.innerHTML = state.moves.map(m => `
         <div class="move">
-          <strong>#${m.move_number}</strong> — Player ${m.player_id}${Number(m.player_id) === Number(state.playerId) ? " (you)" : ""}
-          fired at (${m.row}, ${m.col}) → <strong>${m.result}</strong><br>
-          <span class="small">${m.timestamp}</span>
+          <strong>#${m.move_number ?? "?"}</strong> —
+          Player ${m.player_id}${Number(m.player_id) === Number(state.playerId) ? " (you)" : ""}
+          fired at ${m.target_player_id != null ? `Player ${m.target_player_id} ` : ""}(${m.row}, ${m.col}) → <strong>${m.result}</strong><br>
+          <span class="small">${m.timestamp ?? ""}</span>
         </div>
       `).join("");
     }
@@ -610,20 +619,28 @@
       const board = document.createElement("div");
       board.className = "board";
       board.style.gridTemplateColumns = `repeat(${size + 1}, 34px)`;
+
       for (let r = -1; r < size; r++) {
         for (let c = -1; c < size; c++) {
           const cell = document.createElement("div");
           cell.className = "cell";
-          if (r === -1 && c === -1) cell.classList.add("label");
-          else if (r === -1) { cell.classList.add("label"); cell.textContent = c; }
-          else if (c === -1) { cell.classList.add("label"); cell.textContent = r; }
-          else {
+
+          if (r === -1 && c === -1) {
+            cell.classList.add("label");
+          } else if (r === -1) {
+            cell.classList.add("label");
+            cell.textContent = c;
+          } else if (c === -1) {
+            cell.classList.add("label");
+            cell.textContent = r;
+          } else {
             if (decorate) decorate(cell, r, c);
             if (clickHandler && !cell.classList.contains("disabled")) {
               cell.classList.add("clickable");
               cell.onclick = () => clickHandler(r, c);
             }
           }
+
           board.appendChild(cell);
         }
       }
@@ -633,21 +650,27 @@
     function renderSetupBoard() {
       const size = state.gridSize || 8;
       const placed = new Set();
-      (state.myBoard?.ships || []).forEach(ship => (ship.coordinates || []).forEach(([r,c]) => placed.add(`${r},${c}`)));
+      (state.boardData?.ships || []).forEach(ship => (ship.coordinates || []).forEach(([r, c]) => placed.add(`${r},${c}`)));
+
       const board = buildBoard(size, (!playerHasPlacedShips() && state.game?.status === "waiting_setup") ? toggleShipCell : null, (cell, r, c) => {
         const key = `${r},${c}`;
         if (placed.has(key)) cell.classList.add("ship");
-        else if (state.selectedShips.includes(key)) { cell.classList.add("selected"); cell.textContent = "S"; }
+        else if (state.selectedShips.includes(key)) {
+          cell.classList.add("selected");
+          cell.textContent = "S";
+        }
         if (playerHasPlacedShips()) cell.classList.add("disabled");
       });
+
       el.myBoardWrapSetup.innerHTML = "";
       el.myBoardWrapSetup.appendChild(board);
     }
 
     function toggleShipCell(r, c) {
       const key = `${r},${c}`;
-      if (state.selectedShips.includes(key)) state.selectedShips = state.selectedShips.filter(x => x !== key);
-      else {
+      if (state.selectedShips.includes(key)) {
+        state.selectedShips = state.selectedShips.filter(x => x !== key);
+      } else {
         if (state.selectedShips.length >= 3) return log("You must select exactly 3 cells.", true);
         state.selectedShips.push(key);
       }
@@ -658,12 +681,13 @@
     async function placeShips() {
       if (!state.playerId || !state.gameId) return log("You need a player and a match first.", true);
       if (state.selectedShips.length !== 3) return log("Select exactly 3 cells first.", true);
+
       try {
         const ships = state.selectedShips.map(k => {
           const [row, col] = k.split(",").map(Number);
-          return {row, col};
+          return { row, col };
         });
-        await api(`/api/games/${state.gameId}/place`, {method:"POST", body:{player_id: state.playerId, ships}});
+        await api(`/api/games/${state.gameId}/place`, { method: "POST", body: { player_id: state.playerId, ships } });
         state.selectedShips = [];
         updateSelectionUI();
         log("Ships placed successfully.");
@@ -673,79 +697,87 @@
       }
     }
 
-    function boardShipSet(boardData) {
-      const shipSet = new Set();
-      (boardData?.ships || []).forEach(ship => (ship.coordinates || []).forEach(([r,c]) => shipSet.add(`${r},${c}`)));
-      return shipSet;
-    }
-
-    function boardHitMissSets(boardData) {
+    function incomingShotSets() {
       const hits = new Set();
       const misses = new Set();
-      (boardData?.hits || []).forEach(([r,c]) => hits.add(`${r},${c}`));
-      (boardData?.misses || []).forEach(([r,c]) => misses.add(`${r},${c}`));
-      return {hits, misses};
+      (state.boardData?.hits || []).forEach(([r, c]) => hits.add(`${r},${c}`));
+      (state.boardData?.misses || []).forEach(([r, c]) => misses.add(`${r},${c}`));
+      return { hits, misses };
+    }
+
+    function outgoingShotSets(targetPlayerId) {
+      const hits = new Set();
+      const misses = new Set();
+      state.moves.forEach(m => {
+        if (Number(m.player_id) !== Number(state.playerId)) return;
+        if (targetPlayerId != null && m.target_player_id != null && Number(m.target_player_id) !== Number(targetPlayerId)) return;
+        const key = `${m.row},${m.col}`;
+        if (m.result === "hit") hits.add(key); else misses.add(key);
+      });
+      return { hits, misses };
     }
 
     function renderBoards() {
-      el.boardsGrid.innerHTML = "";
-      if (!state.game) return;
-      const size = state.gridSize || 8;
+      if (!state.game) {
+        el.boardsGrid.innerHTML = "";
+        return;
+      }
 
-      const myCard = document.createElement("div");
-      myCard.className = "card";
-      myCard.innerHTML = `<h3>Your Board</h3><div class="small">Your ships and incoming hits appear here.</div>`;
-      const myShipSet = boardShipSet(state.myBoard);
-      const myShots = boardHitMissSets(state.myBoard);
+      const size = state.gridSize || 8;
+      el.boardsGrid.innerHTML = "";
+
+      const mineCard = document.createElement("div");
+      mineCard.className = "card";
+      mineCard.innerHTML = `<h3>Your Board</h3><div class="small">Your ships and incoming shots will appear here.</div>`;
+      const mineWrap = document.createElement("div");
+      const shipSet = new Set();
+      (state.boardData?.ships || []).forEach(ship => (ship.coordinates || []).forEach(([r, c]) => shipSet.add(`${r},${c}`)));
+      const incoming = incomingShotSets();
+
       const myBoard = buildBoard(size, null, (cell, r, c) => {
         const key = `${r},${c}`;
-        if (myShipSet.has(key)) cell.classList.add("ship");
-        if (myShots.hits.has(key)) { cell.classList.remove("ship"); cell.classList.add("hit"); cell.textContent = "X"; }
-        else if (myShots.misses.has(key)) { cell.classList.add("miss"); cell.textContent = "•"; }
+        if (shipSet.has(key)) cell.classList.add("ship");
+        if (incoming.hits.has(key)) { cell.classList.remove("ship"); cell.classList.add("hit"); cell.textContent = "X"; }
+        else if (incoming.misses.has(key)) { cell.classList.add("miss"); cell.textContent = "•"; }
         cell.classList.add("disabled");
       });
-      myCard.appendChild(myBoard);
-      el.boardsGrid.appendChild(myCard);
+      mineWrap.appendChild(myBoard);
+      mineCard.appendChild(mineWrap);
+      el.boardsGrid.appendChild(mineCard);
 
       const myTurn = state.game.status === "playing" && Number(state.game.current_turn_player_id) === Number(state.playerId);
-      const serverTargetId = getServerTargetPlayerId();
 
       getOpponentPlayers().forEach(opponent => {
-        const boardData = state.opponentBoards[opponent.player_id] || null;
-        const shipSet = boardShipSet(boardData);
-        const shotSets = boardHitMissSets(boardData);
         const eliminated = isPlayerEliminated(opponent);
-        const serverTarget = Number(opponent.player_id) === Number(serverTargetId);
-        const canFire = myTurn && serverTarget && !eliminated;
-
+        const shotSets = outgoingShotSets(opponent.player_id);
         const card = document.createElement("div");
         card.className = "card";
-        card.innerHTML = `
-          <h3>Player ${opponent.player_id}${serverTarget ? " — Active Target" : ""}${eliminated ? " — Eliminated" : ""}</h3>
-          <div class="small">${eliminated ? "Eliminated." : serverTarget ? "This is the board your current backend will fire at." : "Visible for board state only."}</div>
-        `;
+        card.innerHTML = `<h3>Player ${opponent.player_id}${eliminated ? " — Eliminated" : ""}</h3><div class="small">${eliminated ? "This opponent has been eliminated." : "Click here when it is your turn."}</div>`;
 
-        const board = buildBoard(size, canFire ? ((r, c) => fireAt(r, c)) : null, (cell, r, c) => {
+        const board = buildBoard(size, myTurn && !eliminated ? (r, c) => fireAt(opponent.player_id, r, c) : null, (cell, r, c) => {
           const key = `${r},${c}`;
-          if (shipSet.has(key)) cell.classList.add("ship");
-          if (shotSets.hits.has(key)) { cell.classList.remove("ship"); cell.classList.add("hit"); cell.textContent = "X"; }
+          const already = shotSets.hits.has(key) || shotSets.misses.has(key);
+          if (shotSets.hits.has(key)) { cell.classList.add("hit"); cell.textContent = "X"; }
           else if (shotSets.misses.has(key)) { cell.classList.add("miss"); cell.textContent = "•"; }
-          if (!canFire) cell.classList.add("disabled");
+          if (!myTurn || already || eliminated) cell.classList.add("disabled");
         });
+
         card.appendChild(board);
         el.boardsGrid.appendChild(card);
       });
     }
 
-    async function fireAt(row, col) {
+    async function fireAt(targetPlayerId, row, col) {
       if (!state.game || !state.playerId || !state.gameId) return log("Join a match first.", true);
       if (state.game.status !== "playing") return log("The match is not in playing state yet.", true);
       if (Number(state.game.current_turn_player_id) !== Number(state.playerId)) return log("It is not your turn.", true);
+
       try {
-        const data = await api(`/api/games/${state.gameId}/fire`, {method:"POST", body:{player_id: state.playerId, row, col}});
-        log(`Fired at (${row}, ${col}) → ${data.result}.`);
+        const body = { player_id: state.playerId, row, col };
+        if (targetPlayerId != null) body.target_player_id = targetPlayerId;
+        const data = await api(`/api/games/${state.gameId}/fire`, { method: "POST", body });
+        log(`Fired at Player ${targetPlayerId ?? "?"} (${row}, ${col}) → ${data.result}.`);
         if (data.winner_id != null) log(`Match finished. Winner: Player ${data.winner_id}.`);
-        else if (data.next_player_id != null) log(`Next turn: Player ${data.next_player_id}.`);
         await refreshGame();
       } catch (err) {
         log(`Fire failed: ${err.message}`, true);
@@ -754,9 +786,9 @@
 
     function startPolling() {
       if (state.pollId) clearInterval(state.pollId);
-      if (state.lobbyPollId) clearInterval(state.lobbyPollId);
       state.pollId = setInterval(() => { if (state.gameId) refreshGame(); }, 4000);
-      state.lobbyPollId = setInterval(loadLobby, 8000);
+      if (state.lobbyPollId) clearInterval(state.lobbyPollId);
+      state.lobbyPollId = setInterval(loadOpenGames, 5000);
     }
 
     function init() {
@@ -767,10 +799,11 @@
       el.gridSize.value = state.gridSize || 8;
       el.currentGameId.textContent = state.gameId ?? "None";
       if (state.gameId) el.gameIdInput.value = state.gameId;
+
       updateSelectionUI();
       renderAll();
       pingApi();
-      loadLobby();
+      loadOpenGames();
       if (state.playerId) loadStats();
       if (state.gameId) refreshGame();
       startPolling();
