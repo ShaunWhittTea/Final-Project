@@ -478,6 +478,122 @@ def build_board_view(cur, game_id, player_id, grid_size):
     return board_rows
 
 
+
+def board_matrix_for_viewer(cur, game_id, owner_player_id, viewer_player_id, grid_size, reveal_all=False):
+    ship_cells = set()
+    cur.execute(
+        """
+        SELECT row_index, col_index
+        FROM ships
+        WHERE game_id = %s AND player_id = %s
+        """,
+        (game_id, owner_player_id)
+    )
+    for row in cur.fetchall():
+        ship_cells.add((row["row_index"], row["col_index"]))
+
+    targeted_by_any = {}
+    cur.execute(
+        """
+        SELECT attacker_player_id, row_index, col_index, result
+        FROM shots
+        WHERE game_id = %s AND target_player_id = %s
+        ORDER BY created_at, shot_id
+        """,
+        (game_id, owner_player_id)
+    )
+    for shot in cur.fetchall():
+        targeted_by_any[(shot["row_index"], shot["col_index"])] = {
+            "attacker_player_id": shot["attacker_player_id"],
+            "result": shot["result"],
+        }
+
+    viewer_shots = {}
+    cur.execute(
+        """
+        SELECT row_index, col_index, result
+        FROM shots
+        WHERE game_id = %s AND attacker_player_id = %s AND target_player_id = %s
+        ORDER BY created_at, shot_id
+        """,
+        (game_id, viewer_player_id, owner_player_id)
+    )
+    for shot in cur.fetchall():
+        viewer_shots[(shot["row_index"], shot["col_index"])] = shot["result"]
+
+    grid = []
+    for r in range(grid_size):
+        row_cells = []
+        for c in range(grid_size):
+            cell = "empty"
+            coord = (r, c)
+            if owner_player_id == viewer_player_id:
+                if coord in ship_cells and coord in targeted_by_any and targeted_by_any[coord]["result"] == "hit":
+                    cell = "sunk"
+                elif coord in ship_cells:
+                    cell = "ship"
+                elif coord in targeted_by_any and targeted_by_any[coord]["result"] == "miss":
+                    cell = "miss"
+            else:
+                if coord in viewer_shots:
+                    cell = "sunk" if viewer_shots[coord] == "hit" else "miss"
+                elif reveal_all and coord in ship_cells:
+                    cell = "ship"
+            row_cells.append(cell)
+        grid.append(row_cells)
+    return grid
+
+
+def winner_for_game(cur, game_id):
+    survivors = surviving_players(cur, game_id)
+    if len(survivors) == 1:
+        return survivors[0]
+    return None
+
+
+def build_boards_payload(cur, game_id, viewer_player_id):
+    game = get_game_row(cur, game_id)
+    if not game:
+        return None
+
+    viewer_membership = player_in_game(cur, game_id, viewer_player_id)
+    if not viewer_membership:
+        return None
+
+    turn_rows = get_turn_order_rows(cur, game_id)
+    reveal_all = game["status"] == FINISHED_STATUS
+    current_turn_id = current_turn_player_id(cur, game_id) if game["status"] == PLAYING_STATUS else None
+    winner_id = winner_for_game(cur, game_id) if game["status"] == FINISHED_STATUS else None
+
+    boards = []
+    for row in turn_rows:
+        owner_id = row["player_id"]
+        boards.append({
+            "player_id": owner_id,
+            "username": row["username"],
+            "turn_order": row["turn_order"],
+            "is_viewer": owner_id == viewer_player_id,
+            "is_current_turn": owner_id == current_turn_id,
+            "placed": player_has_placed(cur, game_id, owner_id),
+            "ships_remaining": ships_remaining_for_player(cur, game_id, owner_id),
+            "eliminated": ships_remaining_for_player(cur, game_id, owner_id) == 0,
+            "grid": board_matrix_for_viewer(cur, game_id, owner_id, viewer_player_id, game["grid_size"], reveal_all=reveal_all),
+        })
+
+    return {
+        "game_id": game_id,
+        "viewer_player_id": viewer_player_id,
+        "grid_size": game["grid_size"],
+        "max_players": game["max_players"],
+        "status": game["status"],
+        "current_turn_index": game["current_turn_index"],
+        "current_turn_player_id": current_turn_id,
+        "your_turn": current_turn_id == viewer_player_id if current_turn_id is not None else False,
+        "winner_id": winner_id,
+        "boards": boards,
+    }
+
+
 try:
     init_db()
     if TEST_MODE and AUTO_RESET_ON_START:
@@ -1208,6 +1324,73 @@ def get_moves(game_id):
     except Exception as ex:
         print(f"Get moves error: {ex}")
         return error_response("internal_error", "Failed to fetch moves", 500)
+
+
+
+
+@app.get("/api/leaderboard")
+def leaderboard():
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT player_id, username, total_games, total_wins, total_losses, total_moves, total_hits
+                    FROM players
+                    ORDER BY total_wins DESC, total_hits DESC, total_moves ASC, player_id ASC
+                    LIMIT 25
+                    """
+                )
+                rows = cur.fetchall()
+
+        players = []
+        for row in rows:
+            shots = row["total_moves"] or 0
+            hits = row["total_hits"] or 0
+            players.append({
+                "player_id": row["player_id"],
+                "username": row["username"],
+                "games": row["total_games"],
+                "wins": row["total_wins"],
+                "losses": row["total_losses"],
+                "shots": shots,
+                "hits": hits,
+                "accuracy": round((hits / shots), 3) if shots else 0.0,
+            })
+        return jsonify({"players": players}), 200
+    except Exception as ex:
+        print(f"Leaderboard error: {ex}")
+        return error_response("internal_error", "Failed to fetch leaderboard", 500)
+
+
+@app.get("/api/games/<int:game_id>/boards")
+@app.get("/api/games/<game_id>/boards")
+def get_game_boards(game_id):
+    game_id = resolve_game_id(game_id)
+    if not is_valid_int_id(game_id):
+        return error_response("not_found", "Game does not exist", 404)
+
+    viewer_player_id = request.args.get("viewer_player_id") or request.args.get("player_id")
+    viewer_player_id = resolve_player_id(viewer_player_id)
+    if not is_valid_int_id(viewer_player_id):
+        return error_response("bad_request", "viewer_player_id is required", 400)
+
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                game = get_game_row(cur, game_id)
+                if not game:
+                    return error_response("not_found", "Game does not exist", 404)
+                if not get_player_row(cur, viewer_player_id):
+                    return error_response("not_found", "Player does not exist", 404)
+                if not player_in_game(cur, game_id, viewer_player_id):
+                    return error_response("forbidden", "Player not in game", 403)
+
+                payload = build_boards_payload(cur, game_id, viewer_player_id)
+                return jsonify(payload), 200
+    except Exception as ex:
+        print(f"Get game boards error: {ex}")
+        return error_response("internal_error", "Failed to fetch game boards", 500)
 
 
 @app.post("/api/test/games/<int:game_id>/restart")
