@@ -6,118 +6,58 @@
   <title>Battleship</title>
   <style>
     :root{
-      --bg:#0f172a;
-      --panel:#111827;
-      --panel2:#1f2937;
-      --border:#334155;
-      --text:#e5e7eb;
-      --muted:#94a3b8;
-      --accent:#38bdf8;
-      --success:#22c55e;
-      --warning:#f59e0b;
-      --danger:#ef4444;
-      --water:#1e293b;
-      --ship:#14532d;
-      --ship-border:#22c55e;
-      --hit:#7f1d1d;
-      --hit-border:#ef4444;
-      --miss:#334155;
-      --miss-border:#94a3b8;
-      --glow:0 10px 30px rgba(0,0,0,.25);
+      --bg:#0f172a; --panel:#111827; --border:#334155; --text:#e5e7eb; --muted:#94a3b8;
+      --accent:#38bdf8; --success:#22c55e; --warning:#f59e0b; --danger:#ef4444;
+      --water:#1e293b; --ship:#14532d; --ship-border:#22c55e; --hit:#7f1d1d; --miss:#334155;
     }
     *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family:Arial, Helvetica, sans-serif;
-      background:linear-gradient(180deg,#020617,#0f172a);
-      color:var(--text);
-      min-height:100vh;
-    }
-    .container{max-width:1440px;margin:0 auto;padding:24px}
-    .hero{
-      background:linear-gradient(135deg,#0f172a,#1e293b);
-      border:1px solid var(--border);
-      border-radius:20px;
-      padding:24px;
-      margin-bottom:20px;
-      box-shadow:var(--glow);
-    }
-    .hero h1{margin:0 0 8px 0;font-size:2.2rem}
-    .hero p{margin:0;color:var(--muted);line-height:1.5}
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:linear-gradient(180deg,#020617,#0f172a);color:var(--text)}
+    .container{max-width:1380px;margin:0 auto;padding:24px}
+    .hero,.card{background:rgba(17,24,39,.97);border:1px solid var(--border);border-radius:18px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+    .hero{padding:24px;margin-bottom:20px}
+    .hero h1{margin:0 0 8px 0}.hero p{margin:0;color:var(--muted)}
     .layout{display:grid;grid-template-columns:360px 1fr;gap:20px}
     .left,.right{display:flex;flex-direction:column;gap:20px}
-    .card{
-      background:rgba(17,24,39,.97);
-      border:1px solid var(--border);
-      border-radius:18px;
-      padding:18px;
-      box-shadow:0 8px 24px rgba(0,0,0,.18);
-    }
-    h2,h3{margin-top:0;margin-bottom:12px}
-    label{display:block;margin-bottom:6px;color:var(--muted);font-size:.92rem}
-    input,button,select{
-      width:100%;padding:11px 12px;border-radius:11px;font-size:.96rem;border:1px solid var(--border);
-    }
-    input,select{background:#0b1220;color:var(--text)}
-    button{
-      border:none;cursor:pointer;font-weight:700;transition:transform .08s ease, opacity .08s ease;
-      background:var(--accent);color:#001018;
-    }
-    button:hover{transform:translateY(-1px);opacity:.96}
+    .card{padding:18px}
+    h2,h3{margin:0 0 12px 0}
+    label{display:block;margin:0 0 6px 0;color:var(--muted);font-size:.92rem}
+    input,button{width:100%;padding:11px 12px;border-radius:11px;font-size:.96rem;border:1px solid var(--border)}
+    input{background:#0b1220;color:var(--text)}
+    button{border:none;cursor:pointer;font-weight:700;background:var(--accent);color:#001018}
     button.secondary{background:#334155;color:var(--text)}
     button.success{background:var(--success);color:#04120a}
     button.warning{background:var(--warning);color:#1f1300}
-    button.danger{background:var(--danger);color:white}
-    button:disabled{opacity:.55;cursor:not-allowed;transform:none}
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    .row>*{flex:1;min-width:120px}
-    .status-box{
-      background:#020617;border:1px solid var(--border);border-radius:14px;padding:12px;line-height:1.5;
-    }
-    .small{color:var(--muted);font-size:.88rem}
-    .hidden{display:none !important}
-    .pill{
-      display:inline-block;border-radius:999px;padding:5px 10px;font-size:.82rem;font-weight:700;
-      background:#1e293b;border:1px solid var(--border);margin-right:6px;margin-bottom:6px;
-    }
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
+    .status,.game-item,.move{background:#020617;border:1px solid var(--border);border-radius:12px;padding:12px}
+    .small,.meta{color:var(--muted);font-size:.88rem}
+    .banner{border-radius:14px;padding:12px 14px;font-weight:700;margin-bottom:12px;border:1px solid var(--border)}
+    .banner.wait{background:rgba(245,158,11,.14);color:#fde68a;border-color:#b45309}
+    .banner.turn{background:rgba(34,197,94,.14);color:#bbf7d0;border-color:#15803d}
+    .banner.hold{background:rgba(56,189,248,.14);color:#bae6fd;border-color:#0284c7}
+    .banner.done{background:rgba(239,68,68,.14);color:#fecaca;border-color:#b91c1c}
+    .pill{display:inline-block;border-radius:999px;padding:5px 10px;font-size:.82rem;font-weight:700;background:#1e293b;border:1px solid var(--border);margin:0 6px 6px 0}
     .pill.waiting{background:rgba(245,158,11,.14);border-color:#b45309;color:#fde68a}
     .pill.playing{background:rgba(34,197,94,.14);border-color:#15803d;color:#bbf7d0}
-    .pill.finished{background:rgba(239,68,68,.14);border-color:#b91c1c;color:#fecaca}
-    .pill.eliminated{background:rgba(239,68,68,.18);border-color:#ef4444;color:#fecaca}
-    .pill.winner{background:rgba(34,197,94,.18);border-color:#22c55e;color:#bbf7d0}
-    .boards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
-    .board{display:grid;gap:4px;justify-content:start;margin-top:12px}
-    .cell{
-      width:34px;height:34px;border-radius:8px;border:1px solid #475569;display:flex;align-items:center;
-      justify-content:center;font-size:.82rem;font-weight:700;background:var(--water);user-select:none;
-    }
-    .cell.label{background:transparent;border:none;color:var(--muted)}
-    .cell.clickable{cursor:pointer}
-    .cell.clickable:hover{transform:scale(1.03);border-color:var(--accent)}
-    .cell.ship{background:var(--ship);border-color:var(--ship-border)}
-    .cell.hit{background:var(--hit);border-color:var(--hit-border);color:#fecaca}
-    .cell.miss{background:var(--miss);border-color:var(--miss-border);color:#cbd5e1}
-    .cell.selected{outline:2px solid white;outline-offset:1px}
-    .cell.disabled{opacity:.55;cursor:not-allowed}
-    .moves,.games-list{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow:auto;margin-top:8px}
-    .move,.game-item{
-      background:#020617;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:.92rem;
-    }
-    .game-item .meta{color:var(--muted);font-size:.85rem;margin-top:6px}
-    .log{
-      background:#020617;border:1px solid var(--border);border-radius:12px;padding:12px;max-height:240px;overflow:auto;
-      white-space:pre-wrap;font-family:Consolas, monospace;font-size:.9rem;line-height:1.4;
-    }
-    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
-    .stat{background:#020617;border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+    .pill.finished,.pill.eliminated{background:rgba(239,68,68,.14);border-color:#b91c1c;color:#fecaca}
+    .pill.winner{background:rgba(34,197,94,.14);border-color:#15803d;color:#bbf7d0}
+    .stats,.boards-grid,.games-list,.moves{display:grid;gap:10px}
+    .stats{grid-template-columns:repeat(3,1fr);margin-top:10px}
+    .boards-grid{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+    .games-list,.moves{max-height:320px;overflow:auto}
+    .stat{text-align:center;background:#020617;border:1px solid var(--border);border-radius:12px;padding:12px}
     .stat b{display:block;margin-top:4px;font-size:1.3rem}
-    .banner{
-      border-radius:14px;padding:14px 16px;font-weight:700;border:1px solid var(--border);margin-bottom:12px;
-    }
-    .banner.turn{background:rgba(34,197,94,.14);color:#bbf7d0;border-color:#15803d}
-    .banner.wait{background:rgba(245,158,11,.14);color:#fde68a;border-color:#b45309}
-    .banner.win{background:rgba(34,197,94,.18);color:#bbf7d0;border-color:#22c55e}
-    .banner.lose{background:rgba(239,68,68,.18);color:#fecaca;border-color:#ef4444}
+    .board{display:grid;gap:4px;justify-content:start;margin-top:12px}
+    .cell{width:34px;height:34px;border-radius:8px;border:1px solid #475569;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:700;background:var(--water);user-select:none}
+    .cell.label{background:transparent;border:none;color:var(--muted)}
+    .cell.clickable{cursor:pointer}.cell.clickable:hover{border-color:var(--accent);transform:scale(1.03)}
+    .cell.ship{background:var(--ship);border-color:var(--ship-border)}
+    .cell.hit{background:var(--hit);border-color:#ef4444;color:#fecaca}
+    .cell.miss{background:var(--miss);border-color:#94a3b8;color:#cbd5e1}
+    .cell.selected{outline:2px solid white;outline-offset:1px}
+    .cell.disabled{opacity:.6;cursor:not-allowed}
+    .log{background:#020617;border:1px solid var(--border);border-radius:12px;padding:12px;max-height:240px;overflow:auto;white-space:pre-wrap;font-family:Consolas,monospace;font-size:.9rem;line-height:1.4}
+    .hidden{display:none!important}
     @media (max-width:1100px){.layout{grid-template-columns:1fr}}
     @media (max-width:700px){.cell{width:28px;height:28px;font-size:.72rem}}
   </style>
@@ -126,9 +66,7 @@
   <div class="container">
     <div class="hero">
       <h1>Battleship</h1>
-      <p>
-        This client works across different computers as long as everyone opens the same deployed site URL. Create or join a live match, then the page polls the server for updates.
-      </p>
+      <p>Use the same deployed site URL on different computers. Each browser keeps its own player in sessionStorage.</p>
     </div>
 
     <div class="layout">
@@ -137,25 +75,24 @@
           <h2>Connection</h2>
           <label for="apiBase">API Base URL</label>
           <input id="apiBase" type="text" placeholder="https://your-render-app.onrender.com">
-          <div class="row" style="margin-top:10px;">
+          <div class="row" style="margin-top:10px">
             <button onclick="saveApiBase()">Save</button>
             <button class="secondary" onclick="pingApi()">Check API</button>
           </div>
-          <div id="apiInfo" class="status-box" style="margin-top:12px;">No API checked yet.</div>
+          <div id="apiInfo" class="status" style="margin-top:12px">No API checked yet.</div>
         </div>
 
         <div class="card">
           <h2>Your Player</h2>
           <label for="username">Username</label>
           <input id="username" type="text" placeholder="Enter a username for this browser">
-          <div class="row" style="margin-top:10px;">
+          <div class="row" style="margin-top:10px">
             <button class="success" onclick="createPlayer()">Create Player</button>
-            <button class="secondary" onclick="loadStats()">Load Stats</button>
+            <button class="secondary" onclick="loadStats()">Stats</button>
           </div>
-          <div class="status-box" style="margin-top:12px;">
+          <div class="status" style="margin-top:12px">
             <div><strong>Player ID:</strong> <span id="playerIdView">None</span></div>
             <div><strong>Username:</strong> <span id="playerNameView">None</span></div>
-            <div class="small" style="margin-top:8px;">Stored in <code>sessionStorage</code> for this browser only.</div>
           </div>
           <div id="stats" class="stats"></div>
         </div>
@@ -172,26 +109,26 @@
               <input id="maxPlayers" type="number" min="2" max="10" value="2">
             </div>
           </div>
-          <div class="row" style="margin-top:12px;">
+          <div class="row" style="margin-top:12px">
             <button class="success" onclick="createGame()">Create Match</button>
             <button class="secondary" onclick="loadOpenGames()">Refresh Lobby</button>
           </div>
-          <div class="status-box" style="margin-top:12px;">
+          <div class="status" style="margin-top:12px">
             <div><strong>Current Game ID:</strong> <span id="currentGameId">None</span></div>
           </div>
         </div>
 
         <div class="card">
           <h2>Open Games</h2>
-          <div class="small">Any computer can join these by opening the same site URL and choosing a match.</div>
-          <div id="gamesList" class="games-list">
+          <div class="small">This list only works if your backend <code>GET /api/games</code> returns actual joinable games.</div>
+          <div id="gamesList" class="games-list" style="margin-top:12px">
             <div class="game-item">No games loaded yet.</div>
           </div>
-          <div style="margin-top:14px;">
+          <div style="margin-top:14px">
             <label for="gameIdInput">Or join by Game ID</label>
             <input id="gameIdInput" type="number" min="1" placeholder="Enter game ID">
           </div>
-          <div class="row" style="margin-top:10px;">
+          <div class="row" style="margin-top:10px">
             <button class="secondary" onclick="joinGame()">Join Selected Game</button>
             <button class="secondary" onclick="refreshGame()">Refresh Current Match</button>
           </div>
@@ -200,11 +137,11 @@
         <div class="card" id="placementCard">
           <h2>Place Ships</h2>
           <p class="small">Select exactly 3 cells on your board, then place your ships.</p>
-          <div class="status-box">
+          <div class="status">
             <div><strong>Selected:</strong> <span id="selectedCount">0</span>/3</div>
             <div><strong>Cells:</strong> <span id="selectedCells">None</span></div>
           </div>
-          <div class="row" style="margin-top:12px;">
+          <div class="row" style="margin-top:12px">
             <button class="success" onclick="placeShips()">Place Ships</button>
             <button class="warning" onclick="clearSelection()">Clear</button>
           </div>
@@ -212,28 +149,35 @@
 
         <div class="card">
           <h2>Log</h2>
-          <div id="log" class="log">Client ready. Use your deployed Render URL if you are playing from different computers.\n</div>
+          <div id="log" class="log">Client ready.\n</div>
         </div>
       </div>
 
       <div class="right">
-        <div class="card" id="statusCard">
+        <div class="card">
           <div id="statusBanner" class="banner wait">Create or join a match to begin.</div>
-          <div id="gameSummary" class="status-box">No game selected yet.</div>
+          <div id="gameSummary" class="status">No game selected yet.</div>
         </div>
 
         <div class="card" id="setupCard">
           <h2>Setup</h2>
-          <div id="setupSummary" class="status-box">Join a game to start setup.</div>
-          <div id="myBoardWrapSetup"></div>
+          <div id="setupSummary" class="status">Join a game to begin setup.</div>
+          <div class="boards-grid" style="margin-top:16px">
+            <div class="card">
+              <h3>Your Board</h3>
+              <div class="small">Choose exactly 3 cells for your ships.</div>
+              <div id="myBoardWrapSetup"></div>
+            </div>
+            <div class="card">
+              <h3>Remote Play</h3>
+              <div class="small">Share the same site URL and game ID with the other player. They do not need your browser open locally.</div>
+            </div>
+          </div>
         </div>
 
-        <div class="boards-grid" id="boardsGrid">
-          <div class="card">
-            <h3>Your Board</h3>
-            <div class="small">Shows your ships and shots received.</div>
-            <div id="myBoardWrap"></div>
-          </div>
+        <div class="card" id="gameCard">
+          <h2>Boards</h2>
+          <div id="boardsGrid" class="boards-grid"></div>
         </div>
 
         <div class="card">
@@ -280,12 +224,12 @@
       gameSummary: document.getElementById("gameSummary"),
       setupSummary: document.getElementById("setupSummary"),
       myBoardWrapSetup: document.getElementById("myBoardWrapSetup"),
-      myBoardWrap: document.getElementById("myBoardWrap"),
       boardsGrid: document.getElementById("boardsGrid"),
       moves: document.getElementById("moves"),
       log: document.getElementById("log"),
       placementCard: document.getElementById("placementCard"),
-      setupCard: document.getElementById("setupCard")
+      setupCard: document.getElementById("setupCard"),
+      gameCard: document.getElementById("gameCard")
     };
 
     function log(msg, isError = false) {
@@ -326,28 +270,26 @@
       const url = `${state.apiBase}${path}`;
       const config = {
         method: options.method || "GET",
-        headers: {
-          "Content-Type": "application/json",
-          ...(options.headers || {})
-        }
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) }
       };
       if (options.body !== undefined) config.body = JSON.stringify(options.body);
 
       const res = await fetch(url, config);
       let data = null;
       try { data = await res.json(); } catch (_) {}
-      if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+      }
       return data;
     }
 
     function normalizeGamesResponse(data) {
       if (Array.isArray(data)) return data;
       if (Array.isArray(data?.games)) return data.games;
+      if (Array.isArray(data?.items)) return data.items;
+      if (Array.isArray(data?.data)) return data.data;
       return [];
-    }
-
-    function getGameMaxPlayers(game = state.game) {
-      return game?.max_players ?? game?.maxPlayers ?? (Number(el.maxPlayers.value) || 2);
     }
 
     function getPlayers() {
@@ -355,19 +297,28 @@
     }
 
     function getOpponentPlayers() {
-      return getPlayers().filter(p => p.player_id !== state.playerId);
+      return getPlayers().filter(p => Number(p.player_id) !== Number(state.playerId));
+    }
+
+    function getGameMaxPlayers(game = state.game) {
+      return Number(game?.max_players ?? game?.maxPlayers ?? Number(el.maxPlayers.value) || 2);
+    }
+
+    function playerHasPlacedShips() {
+      return Array.isArray(state.boardData?.ships) && state.boardData.ships.length >= 3;
     }
 
     function isPlayerEliminated(player) {
-      return Number(player?.ships_remaining ?? 0) <= 0;
+      if (!state.game || state.game.status === "waiting_setup") return false;
+      if (player?.eliminated === true) return true;
+      return Number(player?.ships_remaining ?? 1) <= 0;
     }
 
     function getWinnerId() {
-      const players = getPlayers();
-      if (!players.length) return null;
-      const alive = players.filter(p => !isPlayerEliminated(p));
-      if (alive.length === 1) return alive[0].player_id;
-      return null;
+      if (!state.game || state.game.status !== "finished") return null;
+      if (state.game.winner_id != null) return state.game.winner_id;
+      const alive = getPlayers().filter(p => !isPlayerEliminated(p));
+      return alive.length === 1 ? alive[0].player_id : null;
     }
 
     async function pingApi() {
@@ -389,10 +340,7 @@
 
     async function createPlayer() {
       const username = el.username.value.trim();
-      if (!username) {
-        log("Enter a username first.", true);
-        return;
-      }
+      if (!username) return log("Enter a username first.", true);
       try {
         const data = await api("/api/players", { method: "POST", body: { username } });
         state.playerId = data.player_id;
@@ -400,7 +348,7 @@
         savePlayerSession();
         el.playerIdView.textContent = state.playerId;
         el.playerNameView.textContent = state.username;
-        log(`Created player \"${state.username}\" with ID ${state.playerId}.`);
+        log(`Created player "${state.username}" with ID ${state.playerId}.`);
         await loadStats();
         await loadOpenGames();
       } catch (err) {
@@ -409,10 +357,7 @@
     }
 
     async function loadStats() {
-      if (!state.playerId) {
-        log("No player exists in this browser yet.", true);
-        return;
-      }
+      if (!state.playerId) return log("No player exists in this browser yet.", true);
       try {
         const data = await api(`/api/players/${state.playerId}/stats`);
         el.stats.innerHTML = `
@@ -429,16 +374,15 @@
     }
 
     async function createGame() {
-      if (!state.playerId) {
-        log("Create your player first.", true);
-        return;
-      }
-      const gridSize = Number(el.gridSize.value);
-      const maxPlayers = Number(el.maxPlayers.value);
+      if (!state.playerId) return log("Create your player first.", true);
       try {
         const data = await api("/api/games", {
           method: "POST",
-          body: { creator_id: state.playerId, grid_size: gridSize, max_players: maxPlayers }
+          body: {
+            creator_id: state.playerId,
+            grid_size: Number(el.gridSize.value),
+            max_players: Number(el.maxPlayers.value)
+          }
         });
         state.gameId = data.game_id;
         state.gridSize = data.grid_size;
@@ -450,7 +394,7 @@
         el.currentGameId.textContent = state.gameId;
         el.gameIdInput.value = state.gameId;
         updateSelectionUI();
-        log(`Created match ${state.gameId}. Share this game ID or let other players join from the open games list.`);
+        log(`Created match ${state.gameId}. Share this game ID with another player.`);
         await refreshGame();
         await loadOpenGames();
       } catch (err) {
@@ -458,21 +402,13 @@
       }
     }
 
-    async function joinGame(gameIdArg = null) {
-      if (!state.playerId) {
-        log("Create your player first.", true);
-        return;
-      }
-      const gameId = Number(gameIdArg ?? el.gameIdInput.value);
-      if (!gameId) {
-        log("Enter a game ID or click Join on an open game.", true);
-        return;
-      }
+    async function joinGame(forcedGameId = null) {
+      if (!state.playerId) return log("Create your player first.", true);
+      const gameId = Number(forcedGameId ?? el.gameIdInput.value);
+      if (!gameId) return log("Enter a game ID to join.", true);
+
       try {
-        const data = await api(`/api/games/${gameId}/join`, {
-          method: "POST",
-          body: { player_id: state.playerId }
-        });
+        const data = await api(`/api/games/${gameId}/join`, { method: "POST", body: { player_id: state.playerId } });
         state.gameId = data.game_id;
         saveGameSession();
         el.currentGameId.textContent = state.gameId;
@@ -492,7 +428,6 @@
         renderOpenGames();
       } catch (err) {
         el.gamesList.innerHTML = `<div class="game-item">Could not load games: ${err.message}</div>`;
-        log(`Open games failed: ${err.message}`, true);
       }
     }
 
@@ -505,18 +440,18 @@
       el.gamesList.innerHTML = games.map(game => {
         const gameId = game.game_id ?? game.id;
         const status = game.status ?? "unknown";
-        const activePlayers = game.active_players ?? game.player_count ?? 0;
-        const maxPlayers = game.max_players ?? game.maxPlayers ?? "?";
+        const activePlayers = Number(game.active_players ?? game.player_count ?? 0);
+        const maxPlayers = Number(game.max_players ?? game.maxPlayers ?? 0);
         const gridSize = game.grid_size ?? game.gridSize ?? "?";
-        const full = Number(activePlayers) >= Number(maxPlayers);
-        const joinDisabled = !state.playerId || full || status === "finished";
+        const full = maxPlayers > 0 && activePlayers >= maxPlayers;
+        const disabled = !state.playerId || full || status === "finished";
         return `
           <div class="game-item">
             <div><strong>Game ${gameId}</strong> <span class="pill ${status === 'playing' ? 'playing' : status === 'finished' ? 'finished' : 'waiting'}">${status}</span></div>
-            <div class="meta">Grid ${gridSize}x${gridSize} • Players ${activePlayers}/${maxPlayers}</div>
-            <div class="row" style="margin-top:10px;">
+            <div class="meta">Grid ${gridSize}x${gridSize} • Players ${activePlayers}/${maxPlayers || '?'}</div>
+            <div class="row" style="margin-top:10px">
               <button class="secondary" onclick="selectGameId(${gameId})">Select</button>
-              <button ${joinDisabled ? 'disabled' : ''} onclick="joinGame(${gameId})">Join</button>
+              <button ${disabled ? "disabled" : ""} onclick="joinGame(${gameId})">Join</button>
             </div>
           </div>
         `;
@@ -529,20 +464,15 @@
     }
 
     async function refreshGame() {
-      if (!state.gameId) {
-        renderPanels();
-        return;
-      }
+      if (!state.gameId) return renderAll();
       try {
-        const game = await api(`/api/games/${state.gameId}`);
-        state.game = game;
-        state.gridSize = game.grid_size ?? state.gridSize;
+        state.game = await api(`/api/games/${state.gameId}`);
+        state.gridSize = state.game.grid_size;
         saveGameSession();
         el.currentGameId.textContent = state.gameId;
         await loadBoard();
         await loadMoves();
-        renderPanels();
-        await loadOpenGames();
+        renderAll();
       } catch (err) {
         log(`Refresh failed: ${err.message}`, true);
       }
@@ -556,7 +486,6 @@
         });
       } catch (err) {
         state.boardData = null;
-        log(`Board load failed: ${err.message}`, true);
       }
     }
 
@@ -564,76 +493,75 @@
       if (!state.gameId) return;
       try {
         const data = await api(`/api/games/${state.gameId}/moves`);
-        state.moves = Array.isArray(data?.moves) ? data.moves : [];
+        state.moves = Array.isArray(data?.moves) ? data.moves : Array.isArray(data) ? data : [];
         renderMoves();
       } catch (err) {
         log(`Move history failed: ${err.message}`, true);
       }
     }
 
-    function playerHasPlacedShips() {
-      if (!state.boardData) return false;
-      return Array.isArray(state.boardData.ships) && state.boardData.ships.length >= 3;
-    }
-
-    function renderPanels() {
-      renderStatusBanner();
+    function renderAll() {
+      renderStatus();
       renderSetupSummary();
-      renderGameSummary();
       renderSetupBoard();
-      renderAllBoards();
-      const inSetup = Boolean(state.game && state.game.status === "waiting_setup");
-      el.placementCard.classList.toggle("hidden", !inSetup || playerHasPlacedShips());
-      el.setupCard.classList.toggle("hidden", !inSetup);
+      renderGameSummary();
+      renderBoards();
     }
 
-    function renderStatusBanner() {
-      el.statusBanner.className = "banner wait";
+    function renderStatus() {
       if (!state.game) {
+        el.statusBanner.className = "banner wait";
         el.statusBanner.textContent = "Create or join a match to begin.";
+        el.setupCard.classList.remove("hidden");
+        el.gameCard.classList.remove("hidden");
+        el.placementCard.classList.remove("hidden");
         return;
       }
-      const winnerId = getWinnerId();
-      const meEliminated = getPlayers().some(p => p.player_id === state.playerId && isPlayerEliminated(p));
-      const myTurn = state.game.status === "playing" && state.game.current_turn_player_id === state.playerId;
 
-      if (state.game.status === "finished" || winnerId !== null) {
-        if (winnerId === state.playerId) {
-          el.statusBanner.className = "banner win";
-          el.statusBanner.textContent = `You won Game ${state.game.game_id}.`;
-        } else {
-          el.statusBanner.className = "banner lose";
-          el.statusBanner.textContent = `Game ${state.game.game_id} is finished. Winner: Player ${winnerId ?? 'unknown'}.`;
-        }
-      } else if (meEliminated) {
-        el.statusBanner.className = "banner lose";
-        el.statusBanner.textContent = "You have been eliminated. You can still watch the rest of the game.";
-      } else if (myTurn) {
-        el.statusBanner.className = "banner turn";
-        el.statusBanner.textContent = "It is your turn.";
+      if (state.game.status === "waiting_setup") {
+        const active = Number(state.game.active_players || 0);
+        const max = getGameMaxPlayers();
+        el.statusBanner.className = active < max ? "banner wait" : "banner hold";
+        el.statusBanner.textContent = active < max
+          ? `Waiting for more players to join. ${active}/${max} connected.`
+          : "All players joined. Waiting for ship placement.";
+        el.setupCard.classList.remove("hidden");
+        el.gameCard.classList.add("hidden");
+        el.placementCard.classList.toggle("hidden", playerHasPlacedShips());
+      } else if (state.game.status === "playing") {
+        const myTurn = Number(state.game.current_turn_player_id) === Number(state.playerId);
+        el.statusBanner.className = myTurn ? "banner turn" : "banner hold";
+        el.statusBanner.textContent = myTurn ? "Your turn. Fire on an opponent board." : `Waiting for Player ${state.game.current_turn_player_id}.`;
+        el.setupCard.classList.add("hidden");
+        el.gameCard.classList.remove("hidden");
+        el.placementCard.classList.add("hidden");
       } else {
-        el.statusBanner.className = "banner wait";
-        el.statusBanner.textContent = state.game.status === "waiting_setup" ? "Waiting for all players to place ships." : `Waiting for Player ${state.game.current_turn_player_id}.`;
+        const winnerId = getWinnerId();
+        el.statusBanner.className = "banner done";
+        el.statusBanner.textContent = winnerId ? `Match finished. Winner: Player ${winnerId}.` : "Match finished.";
+        el.setupCard.classList.add("hidden");
+        el.gameCard.classList.remove("hidden");
+        el.placementCard.classList.add("hidden");
       }
     }
 
     function renderSetupSummary() {
       if (!state.game) {
-        el.setupSummary.textContent = "Join a game to start setup.";
+        el.setupSummary.textContent = "Join a game to begin setup.";
         return;
       }
       const playersHtml = getPlayers().map(p => {
-        const me = p.player_id === state.playerId ? " (you)" : "";
-        const status = isPlayerEliminated(p) ? "Eliminated" : `${p.ships_remaining} ships left`;
-        return `<div class="pill ${isPlayerEliminated(p) ? 'eliminated' : ''}">Player ${p.player_id}${me} • ${status}</div>`;
+        const me = Number(p.player_id) === Number(state.playerId) ? " (you)" : "";
+        return `<div class="pill">Player ${p.player_id}${me} • ${p.ships_remaining ?? 0} ships shown</div>`;
       }).join("");
+
       el.setupSummary.innerHTML = `
         <div class="pill waiting">Setup Phase</div>
         <div class="pill">Game ${state.game.game_id}</div>
         <div class="pill">${state.game.grid_size}x${state.game.grid_size}</div>
         <div class="pill">Players Joined: ${state.game.active_players}</div>
-        <div style="margin-top:10px;"><strong>Your Ships Placed:</strong> ${playerHasPlacedShips() ? 'Yes' : 'No'}</div>
-        <div style="margin-top:10px;">${playersHtml || 'No players yet.'}</div>
+        <div style="margin-top:10px"><strong>Your Ships Placed:</strong> ${playerHasPlacedShips() ? "Yes" : "No"}</div>
+        <div style="margin-top:10px">${playersHtml || "No players yet."}</div>
       `;
     }
 
@@ -645,22 +573,30 @@
       const statusClass = state.game.status === "playing" ? "playing" : state.game.status === "finished" ? "finished" : "waiting";
       const winnerId = getWinnerId();
       const playersHtml = getPlayers().map(p => {
-        const me = p.player_id === state.playerId ? " (you)" : "";
-        const isWinner = winnerId === p.player_id;
-        const eliminated = isPlayerEliminated(p);
-        const extraClass = isWinner ? "winner" : eliminated ? "eliminated" : "";
-        const label = isWinner ? "Winner" : eliminated ? "Eliminated" : `${p.ships_remaining} ships left`;
-        return `<div class="pill ${extraClass}">Player ${p.player_id}${me} • ${label}</div>`;
+        const me = Number(p.player_id) === Number(state.playerId) ? " (you)" : "";
+        const winner = winnerId != null && Number(winnerId) === Number(p.player_id);
+        const eliminated = isPlayerEliminated(p) && !winner;
+        const cls = winner ? "winner" : eliminated ? "eliminated" : "";
+        const label = winner ? "Winner" : eliminated ? "Eliminated" : `${p.ships_remaining ?? 0} ships left`;
+        return `<div class="pill ${cls}">Player ${p.player_id}${me} • ${label}</div>`;
       }).join("");
+
+      let statusLine = "Waiting";
+      if (state.game.status === "playing") {
+        statusLine = Number(state.game.current_turn_player_id) === Number(state.playerId) ? "Your turn" : "Opponent's turn";
+      } else if (state.game.status === "finished") {
+        statusLine = winnerId != null ? `Winner: Player ${winnerId}` : "Match finished";
+      }
+
       el.gameSummary.innerHTML = `
         <div class="pill ${statusClass}">${state.game.status}</div>
         <div class="pill">Game ${state.game.game_id}</div>
         <div class="pill">${state.game.grid_size}x${state.game.grid_size}</div>
         <div class="pill">Moves: ${state.game.total_moves}</div>
-        <div style="margin-top:10px;"><strong>Your Player ID:</strong> ${state.playerId ?? 'None'}</div>
-        <div><strong>Current Turn:</strong> ${state.game.current_turn_player_id ?? 'None'}</div>
-        <div><strong>Winner:</strong> ${winnerId ? `Player ${winnerId}` : 'Not decided yet'}</div>
-        <div style="margin-top:10px;">${playersHtml || 'No players found.'}</div>
+        <div style="margin-top:10px"><strong>Your Player ID:</strong> ${state.playerId ?? "None"}</div>
+        <div><strong>Current Turn:</strong> ${state.game.current_turn_player_id ?? "None"}</div>
+        <div><strong>Status:</strong> ${statusLine}</div>
+        <div style="margin-top:10px">${playersHtml || "No players found."}</div>
       `;
     }
 
@@ -669,129 +605,26 @@
         el.moves.innerHTML = `<div class="move">No moves yet.</div>`;
         return;
       }
-      el.moves.innerHTML = state.moves.map(move => {
-        const targetText = move.target_player_id ? ` at Player ${move.target_player_id}` : "";
-        return `
-          <div class="move">
-            <strong>#${move.move_number}</strong> — Player ${move.player_id}${move.player_id === state.playerId ? ' (you)' : ''}
-            fired${targetText} at (${move.row}, ${move.col}) → <strong>${move.result}</strong><br>
-            <span class="small">${move.timestamp}</span>
-          </div>
-        `;
-      }).join("");
+      el.moves.innerHTML = state.moves.map(m => `
+        <div class="move">
+          <strong>#${m.move_number ?? "?"}</strong> —
+          Player ${m.player_id}${Number(m.player_id) === Number(state.playerId) ? " (you)" : ""}
+          fired at ${m.target_player_id != null ? `Player ${m.target_player_id} ` : ""}(${m.row}, ${m.col}) → <strong>${m.result}</strong><br>
+          <span class="small">${m.timestamp ?? ""}</span>
+        </div>
+      `).join("");
     }
 
-    function toggleShipCell(r, c) {
-      if (!state.game || state.game.status !== "waiting_setup") {
-        log("You can only select ships during setup.", true);
-        return;
-      }
-      if (playerHasPlacedShips()) {
-        log("You already placed your ships.", true);
-        return;
-      }
-      const key = `${r},${c}`;
-      if (state.selectedShips.includes(key)) {
-        state.selectedShips = state.selectedShips.filter(x => x !== key);
-      } else {
-        if (state.selectedShips.length >= 3) {
-          log("You must select exactly 3 cells.", true);
-          return;
-        }
-        state.selectedShips.push(key);
-      }
-      updateSelectionUI();
-      renderSetupBoard();
-    }
-
-    async function placeShips() {
-      if (!state.playerId || !state.gameId) {
-        log("You need a player and a match first.", true);
-        return;
-      }
-      if (state.selectedShips.length !== 3) {
-        log("Select exactly 3 cells first.", true);
-        return;
-      }
-      const ships = state.selectedShips.map(k => {
-        const [row, col] = k.split(",").map(Number);
-        return { row, col };
-      });
-      try {
-        await api(`/api/games/${state.gameId}/place`, {
-          method: "POST",
-          body: { player_id: state.playerId, ships }
-        });
-        state.selectedShips = [];
-        updateSelectionUI();
-        log("Ships placed successfully.");
-        await refreshGame();
-      } catch (err) {
-        log(`Place ships failed: ${err.message}`, true);
-      }
-    }
-
-    async function fireAt(targetPlayerId, row, col) {
-      if (!state.game || !state.gameId || !state.playerId) {
-        log("Join a match first.", true);
-        return;
-      }
-      if (state.game.status !== "playing") {
-        log("The match is not in playing state yet.", true);
-        return;
-      }
-      if (state.game.current_turn_player_id !== state.playerId) {
-        log("It is not your turn.", true);
-        return;
-      }
-      try {
-        const body = { player_id: state.playerId, row, col };
-        if (targetPlayerId) body.target_player_id = targetPlayerId;
-        const data = await api(`/api/games/${state.gameId}/fire`, { method: "POST", body });
-        log(`Fired at Player ${targetPlayerId ?? '?'} (${row}, ${col}) → ${data.result}.`);
-        if (data.winner_id) {
-          log(`Match finished. Winner: Player ${data.winner_id}.`);
-        } else if (data.next_player_id) {
-          log(`Next turn: Player ${data.next_player_id}.`);
-        }
-        await refreshGame();
-      } catch (err) {
-        log(`Fire failed: ${err.message}`, true);
-      }
-    }
-
-    function getIncomingShotSets() {
-      const hits = new Set();
-      const misses = new Set();
-      if (state.boardData) {
-        (state.boardData.hits || []).forEach(([r, c]) => hits.add(`${r},${c}`));
-        (state.boardData.misses || []).forEach(([r, c]) => misses.add(`${r},${c}`));
-      }
-      return { hits, misses };
-    }
-
-    function getOutgoingShotSets(targetPlayerId) {
-      const hits = new Set();
-      const misses = new Set();
-      state.moves.forEach(move => {
-        if (move.player_id !== state.playerId) return;
-        const inferredTarget = move.target_player_id ?? (getOpponentPlayers().length === 1 ? getOpponentPlayers()[0].player_id : null);
-        if (targetPlayerId !== null && inferredTarget !== null && Number(inferredTarget) !== Number(targetPlayerId)) return;
-        const key = `${move.row},${move.col}`;
-        if (move.result === "hit") hits.add(key);
-        else misses.add(key);
-      });
-      return { hits, misses };
-    }
-
-    function buildBoard(size, clickHandler, options = {}) {
+    function buildBoard(size, clickHandler, decorate) {
       const board = document.createElement("div");
       board.className = "board";
       board.style.gridTemplateColumns = `repeat(${size + 1}, 34px)`;
+
       for (let r = -1; r < size; r++) {
         for (let c = -1; c < size; c++) {
           const cell = document.createElement("div");
           cell.className = "cell";
+
           if (r === -1 && c === -1) {
             cell.classList.add("label");
           } else if (r === -1) {
@@ -801,12 +634,13 @@
             cell.classList.add("label");
             cell.textContent = r;
           } else {
-            options.decorate?.(cell, r, c);
+            if (decorate) decorate(cell, r, c);
             if (clickHandler && !cell.classList.contains("disabled")) {
               cell.classList.add("clickable");
               cell.onclick = () => clickHandler(r, c);
             }
           }
+
           board.appendChild(cell);
         }
       }
@@ -815,109 +649,144 @@
 
     function renderSetupBoard() {
       const size = state.gridSize || 8;
-      const placedShipSet = new Set();
-      if (state.boardData) {
-        (state.boardData.ships || []).forEach(ship => {
-          (ship.coordinates || []).forEach(([r, c]) => placedShipSet.add(`${r},${c}`));
-        });
-      }
-      const board = buildBoard(size, (!playerHasPlacedShips() ? toggleShipCell : null), {
-        decorate(cell, r, c) {
-          const key = `${r},${c}`;
-          const selected = state.selectedShips.includes(key);
-          if (placedShipSet.has(key)) cell.classList.add("ship");
-          else if (selected) {
-            cell.classList.add("selected");
-            cell.textContent = "S";
-          }
-          if (playerHasPlacedShips()) cell.classList.add("disabled");
+      const placed = new Set();
+      (state.boardData?.ships || []).forEach(ship => (ship.coordinates || []).forEach(([r, c]) => placed.add(`${r},${c}`)));
+
+      const board = buildBoard(size, (!playerHasPlacedShips() && state.game?.status === "waiting_setup") ? toggleShipCell : null, (cell, r, c) => {
+        const key = `${r},${c}`;
+        if (placed.has(key)) cell.classList.add("ship");
+        else if (state.selectedShips.includes(key)) {
+          cell.classList.add("selected");
+          cell.textContent = "S";
         }
+        if (playerHasPlacedShips()) cell.classList.add("disabled");
       });
+
       el.myBoardWrapSetup.innerHTML = "";
       el.myBoardWrapSetup.appendChild(board);
     }
 
-    function renderMyBoardCard() {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.innerHTML = `<h3>Your Board</h3><div class="small">Shows your ships and shots received.</div>`;
-      const wrap = document.createElement("div");
-      const size = state.gridSize || 8;
-      const shipSet = new Set();
-      const { hits, misses } = getIncomingShotSets();
-      if (state.boardData) {
-        (state.boardData.ships || []).forEach(ship => {
-          (ship.coordinates || []).forEach(([r, c]) => shipSet.add(`${r},${c}`));
-        });
+    function toggleShipCell(r, c) {
+      const key = `${r},${c}`;
+      if (state.selectedShips.includes(key)) {
+        state.selectedShips = state.selectedShips.filter(x => x !== key);
+      } else {
+        if (state.selectedShips.length >= 3) return log("You must select exactly 3 cells.", true);
+        state.selectedShips.push(key);
       }
-      const board = buildBoard(size, null, {
-        decorate(cell, r, c) {
-          const key = `${r},${c}`;
-          if (shipSet.has(key)) cell.classList.add("ship");
-          if (hits.has(key)) {
-            cell.classList.remove("ship");
-            cell.classList.add("hit");
-            cell.textContent = "X";
-          } else if (misses.has(key)) {
-            cell.classList.add("miss");
-            cell.textContent = "•";
-          }
-          cell.classList.add("disabled");
-        }
-      });
-      wrap.appendChild(board);
-      card.appendChild(wrap);
-      return card;
+      updateSelectionUI();
+      renderSetupBoard();
     }
 
-    function renderOpponentBoardCard(opponent) {
-      const card = document.createElement("div");
-      card.className = "card";
-      const opponentId = opponent.player_id;
-      const eliminated = isPlayerEliminated(opponent);
-      const myTurn = state.game && state.game.status === "playing" && state.game.current_turn_player_id === state.playerId && !eliminated;
-      const { hits, misses } = getOutgoingShotSets(opponentId);
+    async function placeShips() {
+      if (!state.playerId || !state.gameId) return log("You need a player and a match first.", true);
+      if (state.selectedShips.length !== 3) return log("Select exactly 3 cells first.", true);
 
-      card.innerHTML = `
-        <h3>Player ${opponentId}${eliminated ? ' <span class="pill eliminated">Eliminated</span>' : ''}</h3>
-        <div class="small">${eliminated ? 'This opponent is out of the game.' : 'Click a square on this board when it is your turn.'}</div>
-      `;
+      try {
+        const ships = state.selectedShips.map(k => {
+          const [row, col] = k.split(",").map(Number);
+          return { row, col };
+        });
+        await api(`/api/games/${state.gameId}/place`, { method: "POST", body: { player_id: state.playerId, ships } });
+        state.selectedShips = [];
+        updateSelectionUI();
+        log("Ships placed successfully.");
+        await refreshGame();
+      } catch (err) {
+        log(`Place ships failed: ${err.message}`, true);
+      }
+    }
+
+    function incomingShotSets() {
+      const hits = new Set();
+      const misses = new Set();
+      (state.boardData?.hits || []).forEach(([r, c]) => hits.add(`${r},${c}`));
+      (state.boardData?.misses || []).forEach(([r, c]) => misses.add(`${r},${c}`));
+      return { hits, misses };
+    }
+
+    function outgoingShotSets(targetPlayerId) {
+      const hits = new Set();
+      const misses = new Set();
+      state.moves.forEach(m => {
+        if (Number(m.player_id) !== Number(state.playerId)) return;
+        if (targetPlayerId != null && m.target_player_id != null && Number(m.target_player_id) !== Number(targetPlayerId)) return;
+        const key = `${m.row},${m.col}`;
+        if (m.result === "hit") hits.add(key); else misses.add(key);
+      });
+      return { hits, misses };
+    }
+
+    function renderBoards() {
+      if (!state.game) {
+        el.boardsGrid.innerHTML = "";
+        return;
+      }
+
       const size = state.gridSize || 8;
-      const board = buildBoard(size, myTurn ? ((r, c) => fireAt(opponentId, r, c)) : null, {
-        decorate(cell, r, c) {
-          const key = `${r},${c}`;
-          const alreadyFired = hits.has(key) || misses.has(key);
-          if (hits.has(key)) {
-            cell.classList.add("hit");
-            cell.textContent = "X";
-          } else if (misses.has(key)) {
-            cell.classList.add("miss");
-            cell.textContent = "•";
-          }
-          if (!myTurn || alreadyFired) cell.classList.add("disabled");
-        }
+      el.boardsGrid.innerHTML = "";
+
+      const mineCard = document.createElement("div");
+      mineCard.className = "card";
+      mineCard.innerHTML = `<h3>Your Board</h3><div class="small">Your ships and incoming shots will appear here.</div>`;
+      const mineWrap = document.createElement("div");
+      const shipSet = new Set();
+      (state.boardData?.ships || []).forEach(ship => (ship.coordinates || []).forEach(([r, c]) => shipSet.add(`${r},${c}`)));
+      const incoming = incomingShotSets();
+
+      const myBoard = buildBoard(size, null, (cell, r, c) => {
+        const key = `${r},${c}`;
+        if (shipSet.has(key)) cell.classList.add("ship");
+        if (incoming.hits.has(key)) { cell.classList.remove("ship"); cell.classList.add("hit"); cell.textContent = "X"; }
+        else if (incoming.misses.has(key)) { cell.classList.add("miss"); cell.textContent = "•"; }
+        cell.classList.add("disabled");
       });
-      card.appendChild(board);
-      return card;
+      mineWrap.appendChild(myBoard);
+      mineCard.appendChild(mineWrap);
+      el.boardsGrid.appendChild(mineCard);
+
+      const myTurn = state.game.status === "playing" && Number(state.game.current_turn_player_id) === Number(state.playerId);
+
+      getOpponentPlayers().forEach(opponent => {
+        const eliminated = isPlayerEliminated(opponent);
+        const shotSets = outgoingShotSets(opponent.player_id);
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `<h3>Player ${opponent.player_id}${eliminated ? " — Eliminated" : ""}</h3><div class="small">${eliminated ? "This opponent has been eliminated." : "Click here when it is your turn."}</div>`;
+
+        const board = buildBoard(size, myTurn && !eliminated ? (r, c) => fireAt(opponent.player_id, r, c) : null, (cell, r, c) => {
+          const key = `${r},${c}`;
+          const already = shotSets.hits.has(key) || shotSets.misses.has(key);
+          if (shotSets.hits.has(key)) { cell.classList.add("hit"); cell.textContent = "X"; }
+          else if (shotSets.misses.has(key)) { cell.classList.add("miss"); cell.textContent = "•"; }
+          if (!myTurn || already || eliminated) cell.classList.add("disabled");
+        });
+
+        card.appendChild(board);
+        el.boardsGrid.appendChild(card);
+      });
     }
 
-    function renderAllBoards() {
-      el.boardsGrid.innerHTML = "";
-      el.boardsGrid.appendChild(renderMyBoardCard());
-      if (!state.game) return;
-      getOpponentPlayers().forEach(opponent => {
-        el.boardsGrid.appendChild(renderOpponentBoardCard(opponent));
-      });
+    async function fireAt(targetPlayerId, row, col) {
+      if (!state.game || !state.playerId || !state.gameId) return log("Join a match first.", true);
+      if (state.game.status !== "playing") return log("The match is not in playing state yet.", true);
+      if (Number(state.game.current_turn_player_id) !== Number(state.playerId)) return log("It is not your turn.", true);
+
+      try {
+        const body = { player_id: state.playerId, row, col };
+        if (targetPlayerId != null) body.target_player_id = targetPlayerId;
+        const data = await api(`/api/games/${state.gameId}/fire`, { method: "POST", body });
+        log(`Fired at Player ${targetPlayerId ?? "?"} (${row}, ${col}) → ${data.result}.`);
+        if (data.winner_id != null) log(`Match finished. Winner: Player ${data.winner_id}.`);
+        await refreshGame();
+      } catch (err) {
+        log(`Fire failed: ${err.message}`, true);
+      }
     }
 
     function startPolling() {
       if (state.pollId) clearInterval(state.pollId);
-      state.pollId = setInterval(() => {
-        if (state.gameId) refreshGame();
-      }, 3000);
-    }
-
-    function startLobbyPolling() {
+      state.pollId = setInterval(() => { if (state.gameId) refreshGame(); }, 4000);
       if (state.lobbyPollId) clearInterval(state.lobbyPollId);
       state.lobbyPollId = setInterval(loadOpenGames, 5000);
     }
@@ -930,15 +799,14 @@
       el.gridSize.value = state.gridSize || 8;
       el.currentGameId.textContent = state.gameId ?? "None";
       if (state.gameId) el.gameIdInput.value = state.gameId;
+
       updateSelectionUI();
+      renderAll();
       pingApi();
-      renderPanels();
-      renderOpenGames();
-      if (state.playerId) loadStats();
       loadOpenGames();
+      if (state.playerId) loadStats();
       if (state.gameId) refreshGame();
       startPolling();
-      startLobbyPolling();
     }
 
     init();
