@@ -8,7 +8,7 @@
     :root{
       --bg:#0f172a;
       --panel:#111827;
-      --panel-2:#1f2937;
+      --panel2:#1f2937;
       --border:#334155;
       --text:#e5e7eb;
       --muted:#94a3b8;
@@ -25,9 +25,7 @@
       --miss-border:#94a3b8;
       --glow:0 10px 30px rgba(0,0,0,.25);
     }
-
-    * { box-sizing:border-box; }
-
+    *{box-sizing:border-box}
     body{
       margin:0;
       font-family:Arial, Helvetica, sans-serif;
@@ -35,13 +33,7 @@
       color:var(--text);
       min-height:100vh;
     }
-
-    .container{
-      max-width:1320px;
-      margin:0 auto;
-      padding:24px;
-    }
-
+    .container{max-width:1440px;margin:0 auto;padding:24px}
     .hero{
       background:linear-gradient(135deg,#0f172a,#1e293b);
       border:1px solid var(--border);
@@ -50,34 +42,10 @@
       margin-bottom:20px;
       box-shadow:var(--glow);
     }
-
-    .hero h1{
-      margin:0 0 8px 0;
-      font-size:2.2rem;
-    }
-
-    .hero p{
-      margin:0;
-      color:var(--muted);
-      line-height:1.5;
-    }
-
-    .hidden{
-      display:none !important;
-    }
-
-    .layout{
-      display:grid;
-      grid-template-columns:360px 1fr;
-      gap:20px;
-    }
-
-    .left, .right{
-      display:flex;
-      flex-direction:column;
-      gap:20px;
-    }
-
+    .hero h1{margin:0 0 8px 0;font-size:2.2rem}
+    .hero p{margin:0;color:var(--muted);line-height:1.5}
+    .layout{display:grid;grid-template-columns:360px 1fr;gap:20px}
+    .left,.right{display:flex;flex-direction:column;gap:20px}
     .card{
       background:rgba(17,24,39,.97);
       border:1px solid var(--border);
@@ -85,269 +53,73 @@
       padding:18px;
       box-shadow:0 8px 24px rgba(0,0,0,.18);
     }
-
-    h2, h3{
-      margin-top:0;
-      margin-bottom:12px;
+    h2,h3{margin-top:0;margin-bottom:12px}
+    label{display:block;margin-bottom:6px;color:var(--muted);font-size:.92rem}
+    input,button,select{
+      width:100%;padding:11px 12px;border-radius:11px;font-size:.96rem;border:1px solid var(--border);
     }
-
-    label{
-      display:block;
-      margin-bottom:6px;
-      color:var(--muted);
-      font-size:.92rem;
-    }
-
-    input, button{
-      width:100%;
-      padding:11px 12px;
-      border-radius:11px;
-      font-size:.96rem;
-      border:1px solid var(--border);
-    }
-
-    input{
-      background:#0b1220;
-      color:var(--text);
-    }
-
+    input,select{background:#0b1220;color:var(--text)}
     button{
-      border:none;
-      cursor:pointer;
-      font-weight:700;
-      transition:transform .08s ease, opacity .08s ease;
-      background:var(--accent);
-      color:#001018;
+      border:none;cursor:pointer;font-weight:700;transition:transform .08s ease, opacity .08s ease;
+      background:var(--accent);color:#001018;
     }
-
-    button:hover{
-      transform:translateY(-1px);
-      opacity:.96;
-    }
-
-    button.secondary{
-      background:#334155;
-      color:var(--text);
-    }
-
-    button.success{
-      background:var(--success);
-      color:#04120a;
-    }
-
-    button.warning{
-      background:var(--warning);
-      color:#1f1300;
-    }
-
-    button.danger{
-      background:var(--danger);
-      color:white;
-    }
-
-    .row{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-
-    .row > *{
-      flex:1;
-      min-width:120px;
-    }
-
+    button:hover{transform:translateY(-1px);opacity:.96}
+    button.secondary{background:#334155;color:var(--text)}
+    button.success{background:var(--success);color:#04120a}
+    button.warning{background:var(--warning);color:#1f1300}
+    button.danger{background:var(--danger);color:white}
+    button:disabled{opacity:.55;cursor:not-allowed;transform:none}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .row>*{flex:1;min-width:120px}
     .status-box{
-      background:#020617;
-      border:1px solid var(--border);
-      border-radius:14px;
-      padding:12px;
-      line-height:1.5;
+      background:#020617;border:1px solid var(--border);border-radius:14px;padding:12px;line-height:1.5;
     }
-
-    .small{
-      color:var(--muted);
-      font-size:.88rem;
-    }
-
-    .big-center{
-      text-align:center;
-      padding:34px 18px;
-    }
-
-    .big-center h2{
-      font-size:1.8rem;
-      margin-bottom:10px;
-    }
-
-    .big-center p{
-      color:var(--muted);
-      margin-bottom:18px;
-      line-height:1.55;
-    }
-
+    .small{color:var(--muted);font-size:.88rem}
+    .hidden{display:none !important}
     .pill{
-      display:inline-block;
-      border-radius:999px;
-      padding:5px 10px;
-      font-size:.82rem;
-      font-weight:700;
-      background:#1e293b;
-      border:1px solid var(--border);
-      margin-right:6px;
-      margin-bottom:6px;
+      display:inline-block;border-radius:999px;padding:5px 10px;font-size:.82rem;font-weight:700;
+      background:#1e293b;border:1px solid var(--border);margin-right:6px;margin-bottom:6px;
     }
-
-    .pill.waiting{
-      background:rgba(245,158,11,.14);
-      border-color:#b45309;
-      color:#fde68a;
-    }
-
-    .pill.playing{
-      background:rgba(34,197,94,.14);
-      border-color:#15803d;
-      color:#bbf7d0;
-    }
-
-    .pill.finished{
-      background:rgba(239,68,68,.14);
-      border-color:#b91c1c;
-      color:#fecaca;
-    }
-
-    .boards{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:20px;
-    }
-
-    .board{
-      display:grid;
-      gap:4px;
-      justify-content:start;
-      margin-top:12px;
-    }
-
+    .pill.waiting{background:rgba(245,158,11,.14);border-color:#b45309;color:#fde68a}
+    .pill.playing{background:rgba(34,197,94,.14);border-color:#15803d;color:#bbf7d0}
+    .pill.finished{background:rgba(239,68,68,.14);border-color:#b91c1c;color:#fecaca}
+    .pill.eliminated{background:rgba(239,68,68,.18);border-color:#ef4444;color:#fecaca}
+    .pill.winner{background:rgba(34,197,94,.18);border-color:#22c55e;color:#bbf7d0}
+    .boards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
+    .board{display:grid;gap:4px;justify-content:start;margin-top:12px}
     .cell{
-      width:34px;
-      height:34px;
-      border-radius:8px;
-      border:1px solid #475569;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:.82rem;
-      font-weight:700;
-      background:var(--water);
-      user-select:none;
+      width:34px;height:34px;border-radius:8px;border:1px solid #475569;display:flex;align-items:center;
+      justify-content:center;font-size:.82rem;font-weight:700;background:var(--water);user-select:none;
     }
-
-    .cell.label{
-      background:transparent;
-      border:none;
-      color:var(--muted);
+    .cell.label{background:transparent;border:none;color:var(--muted)}
+    .cell.clickable{cursor:pointer}
+    .cell.clickable:hover{transform:scale(1.03);border-color:var(--accent)}
+    .cell.ship{background:var(--ship);border-color:var(--ship-border)}
+    .cell.hit{background:var(--hit);border-color:var(--hit-border);color:#fecaca}
+    .cell.miss{background:var(--miss);border-color:var(--miss-border);color:#cbd5e1}
+    .cell.selected{outline:2px solid white;outline-offset:1px}
+    .cell.disabled{opacity:.55;cursor:not-allowed}
+    .moves,.games-list{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow:auto;margin-top:8px}
+    .move,.game-item{
+      background:#020617;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:.92rem;
     }
-
-    .cell.clickable{
-      cursor:pointer;
-    }
-
-    .cell.clickable:hover{
-      transform:scale(1.03);
-      border-color:var(--accent);
-    }
-
-    .cell.ship{
-      background:var(--ship);
-      border-color:var(--ship-border);
-    }
-
-    .cell.hit{
-      background:var(--hit);
-      border-color:var(--hit-border);
-      color:#fecaca;
-    }
-
-    .cell.miss{
-      background:var(--miss);
-      border-color:var(--miss-border);
-      color:#cbd5e1;
-    }
-
-    .cell.selected{
-      outline:2px solid white;
-      outline-offset:1px;
-    }
-
-    .cell.disabled{
-      opacity:.55;
-      cursor:not-allowed;
-    }
-
-    .moves{
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-      max-height:320px;
-      overflow:auto;
-      margin-top:8px;
-    }
-
-    .move{
-      background:#020617;
-      border:1px solid var(--border);
-      border-radius:10px;
-      padding:10px;
-      font-size:.92rem;
-    }
-
+    .game-item .meta{color:var(--muted);font-size:.85rem;margin-top:6px}
     .log{
-      background:#020617;
-      border:1px solid var(--border);
-      border-radius:12px;
-      padding:12px;
-      max-height:240px;
-      overflow:auto;
-      white-space:pre-wrap;
-      font-family:Consolas, monospace;
-      font-size:.9rem;
-      line-height:1.4;
+      background:#020617;border:1px solid var(--border);border-radius:12px;padding:12px;max-height:240px;overflow:auto;
+      white-space:pre-wrap;font-family:Consolas, monospace;font-size:.9rem;line-height:1.4;
     }
-
-    .stats{
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:10px;
-      margin-top:10px;
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+    .stat{background:#020617;border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+    .stat b{display:block;margin-top:4px;font-size:1.3rem}
+    .banner{
+      border-radius:14px;padding:14px 16px;font-weight:700;border:1px solid var(--border);margin-bottom:12px;
     }
-
-    .stat{
-      background:#020617;
-      border:1px solid var(--border);
-      border-radius:12px;
-      padding:12px;
-      text-align:center;
-    }
-
-    .stat b{
-      display:block;
-      margin-top:4px;
-      font-size:1.3rem;
-    }
-
-    @media (max-width:1100px){
-      .layout, .boards{
-        grid-template-columns:1fr;
-      }
-    }
-
-    @media (max-width:700px){
-      .cell{
-        width:28px;
-        height:28px;
-        font-size:.72rem;
-      }
-    }
+    .banner.turn{background:rgba(34,197,94,.14);color:#bbf7d0;border-color:#15803d}
+    .banner.wait{background:rgba(245,158,11,.14);color:#fde68a;border-color:#b45309}
+    .banner.win{background:rgba(34,197,94,.18);color:#bbf7d0;border-color:#22c55e}
+    .banner.lose{background:rgba(239,68,68,.18);color:#fecaca;border-color:#ef4444}
+    @media (max-width:1100px){.layout{grid-template-columns:1fr}}
+    @media (max-width:700px){.cell{width:28px;height:28px;font-size:.72rem}}
   </style>
 </head>
 <body>
@@ -355,7 +127,7 @@
     <div class="hero">
       <h1>Battleship</h1>
       <p>
-        One tab is one player. Open a second tab with a different username to join the same match and play against yourself.
+        This client works across different computers as long as everyone opens the same deployed site URL. Create or join a live match, then the page polls the server for updates.
       </p>
     </div>
 
@@ -375,67 +147,59 @@
         <div class="card">
           <h2>Your Player</h2>
           <label for="username">Username</label>
-          <input id="username" type="text" placeholder="Enter a username for this tab">
+          <input id="username" type="text" placeholder="Enter a username for this browser">
           <div class="row" style="margin-top:10px;">
             <button class="success" onclick="createPlayer()">Create Player</button>
-            <button class="secondary" onclick="loadStats()">Stats</button>
+            <button class="secondary" onclick="loadStats()">Load Stats</button>
           </div>
-
           <div class="status-box" style="margin-top:12px;">
             <div><strong>Player ID:</strong> <span id="playerIdView">None</span></div>
             <div><strong>Username:</strong> <span id="playerNameView">None</span></div>
-            <div class="small" style="margin-top:8px;">
-              This is stored per tab using <code>sessionStorage</code>.
-            </div>
+            <div class="small" style="margin-top:8px;">Stored in <code>sessionStorage</code> for this browser only.</div>
           </div>
-
           <div id="stats" class="stats"></div>
         </div>
 
         <div class="card">
-          <h2>Match</h2>
-
-          <div id="matchCreateJoin">
-            <div class="small" style="margin-bottom:12px;">
-              Create a new match here, or join an existing one from another tab using its game ID.
+          <h2>Create Match</h2>
+          <div class="row">
+            <div>
+              <label for="gridSize">Grid Size</label>
+              <input id="gridSize" type="number" min="5" max="15" value="8">
             </div>
-
-            <div class="row">
-              <div>
-                <label for="gridSize">Grid Size</label>
-                <input id="gridSize" type="number" min="5" max="15" value="8">
-              </div>
-              <div>
-                <label for="maxPlayers">Max Players</label>
-                <input id="maxPlayers" type="number" min="2" max="10" value="2">
-              </div>
-            </div>
-
-            <div class="row" style="margin-top:12px;">
-              <button class="success" onclick="createGame()">Create Match</button>
-            </div>
-
-            <div style="margin-top:14px;">
-              <label for="gameIdInput">Join by Game ID</label>
-              <input id="gameIdInput" type="number" min="1" placeholder="Enter game ID">
-            </div>
-
-            <div class="row" style="margin-top:10px;">
-              <button class="secondary" onclick="joinGame()">Join Match</button>
-              <button class="secondary" onclick="refreshGame()">Refresh</button>
+            <div>
+              <label for="maxPlayers">Max Players</label>
+              <input id="maxPlayers" type="number" min="2" max="10" value="2">
             </div>
           </div>
-
-          <div id="matchCurrent" class="status-box" style="margin-top:14px;">
+          <div class="row" style="margin-top:12px;">
+            <button class="success" onclick="createGame()">Create Match</button>
+            <button class="secondary" onclick="loadOpenGames()">Refresh Lobby</button>
+          </div>
+          <div class="status-box" style="margin-top:12px;">
             <div><strong>Current Game ID:</strong> <span id="currentGameId">None</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Open Games</h2>
+          <div class="small">Any computer can join these by opening the same site URL and choosing a match.</div>
+          <div id="gamesList" class="games-list">
+            <div class="game-item">No games loaded yet.</div>
+          </div>
+          <div style="margin-top:14px;">
+            <label for="gameIdInput">Or join by Game ID</label>
+            <input id="gameIdInput" type="number" min="1" placeholder="Enter game ID">
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <button class="secondary" onclick="joinGame()">Join Selected Game</button>
+            <button class="secondary" onclick="refreshGame()">Refresh Current Match</button>
           </div>
         </div>
 
         <div class="card" id="placementCard">
           <h2>Place Ships</h2>
-          <p class="small">
-            Select exactly 3 cells on your board, then place your ships.
-          </p>
+          <p class="small">Select exactly 3 cells on your board, then place your ships.</p>
           <div class="status-box">
             <div><strong>Selected:</strong> <span id="selectedCount">0</span>/3</div>
             <div><strong>Cells:</strong> <span id="selectedCells">None</span></div>
@@ -448,78 +212,33 @@
 
         <div class="card">
           <h2>Log</h2>
-          <div id="log" class="log">Client ready.\n</div>
+          <div id="log" class="log">Client ready. Use your deployed Render URL if you are playing from different computers.\n</div>
         </div>
       </div>
 
       <div class="right">
-        <div id="screenNoGame" class="card big-center">
-          <h2>Start a Match</h2>
-          <p>
-            Create a player first. Then create a new match or join one by game ID.
-          </p>
+        <div class="card" id="statusCard">
+          <div id="statusBanner" class="banner wait">Create or join a match to begin.</div>
+          <div id="gameSummary" class="status-box">No game selected yet.</div>
         </div>
 
-        <div id="screenWaitingOpponent" class="card big-center hidden">
-          <h2>Waiting for Opponent</h2>
-          <p>
-            Share the game ID with another tab or player, then wait for them to join.
-          </p>
-          <div class="status-box" style="max-width:420px; margin:0 auto;">
-            <div><strong>Game ID:</strong> <span id="waitingGameId">None</span></div>
-            <div><strong>Players Joined:</strong> <span id="waitingPlayers">0</span></div>
-          </div>
-          <div class="row" style="margin-top:16px; max-width:420px; margin-left:auto; margin-right:auto;">
-            <button class="secondary" onclick="refreshGame()">Refresh Match</button>
-          </div>
+        <div class="card" id="setupCard">
+          <h2>Setup</h2>
+          <div id="setupSummary" class="status-box">Join a game to start setup.</div>
+          <div id="myBoardWrapSetup"></div>
         </div>
 
-        <div id="screenSetup" class="hidden">
+        <div class="boards-grid" id="boardsGrid">
           <div class="card">
-            <h2>Setup Phase</h2>
-            <div id="setupSummary" class="status-box"></div>
-          </div>
-
-          <div class="boards">
-            <div class="card">
-              <h3>Your Board</h3>
-              <div class="small">Choose 3 cells for your ships.</div>
-              <div id="myBoardWrapSetup"></div>
-            </div>
-
-            <div class="card big-center">
-              <h2>Waiting for All Players to Place Ships</h2>
-              <p>
-                Once every player has placed ships, the match will begin automatically.
-              </p>
-            </div>
+            <h3>Your Board</h3>
+            <div class="small">Shows your ships and shots received.</div>
+            <div id="myBoardWrap"></div>
           </div>
         </div>
 
-        <div id="screenGame" class="hidden">
-          <div class="card">
-            <h2>Match Status</h2>
-            <div id="gameSummary" class="status-box"></div>
-          </div>
-
-          <div class="boards">
-            <div class="card">
-              <h3>Your Board</h3>
-              <div class="small">Shows your ships and incoming hits or misses.</div>
-              <div id="myBoardWrap"></div>
-            </div>
-
-            <div class="card">
-              <h3>Enemy Grid</h3>
-              <div class="small">Click a square here when it is your turn.</div>
-              <div id="enemyBoardWrap"></div>
-            </div>
-          </div>
-
-          <div class="card">
-            <h2>Move History</h2>
-            <div id="moves" class="moves"></div>
-          </div>
+        <div class="card">
+          <h2>Move History</h2>
+          <div id="moves" class="moves"></div>
         </div>
       </div>
     </div>
@@ -537,8 +256,10 @@
       game: null,
       boardData: null,
       moves: [],
+      openGames: [],
       selectedShips: [],
-      pollId: null
+      pollId: null,
+      lobbyPollId: null
     };
 
     const el = {
@@ -550,24 +271,21 @@
       stats: document.getElementById("stats"),
       gridSize: document.getElementById("gridSize"),
       maxPlayers: document.getElementById("maxPlayers"),
+      gamesList: document.getElementById("gamesList"),
       gameIdInput: document.getElementById("gameIdInput"),
       currentGameId: document.getElementById("currentGameId"),
       selectedCount: document.getElementById("selectedCount"),
       selectedCells: document.getElementById("selectedCells"),
-      waitingGameId: document.getElementById("waitingGameId"),
-      waitingPlayers: document.getElementById("waitingPlayers"),
-      setupSummary: document.getElementById("setupSummary"),
+      statusBanner: document.getElementById("statusBanner"),
       gameSummary: document.getElementById("gameSummary"),
+      setupSummary: document.getElementById("setupSummary"),
       myBoardWrapSetup: document.getElementById("myBoardWrapSetup"),
       myBoardWrap: document.getElementById("myBoardWrap"),
-      enemyBoardWrap: document.getElementById("enemyBoardWrap"),
+      boardsGrid: document.getElementById("boardsGrid"),
       moves: document.getElementById("moves"),
       log: document.getElementById("log"),
       placementCard: document.getElementById("placementCard"),
-      screenNoGame: document.getElementById("screenNoGame"),
-      screenWaitingOpponent: document.getElementById("screenWaitingOpponent"),
-      screenSetup: document.getElementById("screenSetup"),
-      screenGame: document.getElementById("screenGame")
+      setupCard: document.getElementById("setupCard")
     };
 
     function log(msg, isError = false) {
@@ -592,16 +310,16 @@
       sessionStorage.setItem("bs_grid_size", String(state.gridSize));
     }
 
+    function updateSelectionUI() {
+      el.selectedCount.textContent = state.selectedShips.length;
+      el.selectedCells.textContent = state.selectedShips.length ? state.selectedShips.join(" | ") : "None";
+    }
+
     function clearSelection() {
       state.selectedShips = [];
       updateSelectionUI();
       renderSetupBoard();
       log("Cleared ship selection.");
-    }
-
-    function updateSelectionUI() {
-      el.selectedCount.textContent = state.selectedShips.length;
-      el.selectedCells.textContent = state.selectedShips.length ? state.selectedShips.join(" | ") : "None";
     }
 
     async function api(path, options = {}) {
@@ -613,23 +331,43 @@
           ...(options.headers || {})
         }
       };
-
-      if (options.body !== undefined) {
-        config.body = JSON.stringify(options.body);
-      }
+      if (options.body !== undefined) config.body = JSON.stringify(options.body);
 
       const res = await fetch(url, config);
       let data = null;
-
-      try {
-        data = await res.json();
-      } catch (_) {}
-
-      if (!res.ok) {
-        throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
-      }
-
+      try { data = await res.json(); } catch (_) {}
+      if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
       return data;
+    }
+
+    function normalizeGamesResponse(data) {
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.games)) return data.games;
+      return [];
+    }
+
+    function getGameMaxPlayers(game = state.game) {
+      return game?.max_players ?? game?.maxPlayers ?? (Number(el.maxPlayers.value) || 2);
+    }
+
+    function getPlayers() {
+      return Array.isArray(state.game?.players) ? state.game.players : [];
+    }
+
+    function getOpponentPlayers() {
+      return getPlayers().filter(p => p.player_id !== state.playerId);
+    }
+
+    function isPlayerEliminated(player) {
+      return Number(player?.ships_remaining ?? 0) <= 0;
+    }
+
+    function getWinnerId() {
+      const players = getPlayers();
+      if (!players.length) return null;
+      const alive = players.filter(p => !isPlayerEliminated(p));
+      if (alive.length === 1) return alive[0].player_id;
+      return null;
     }
 
     async function pingApi() {
@@ -655,22 +393,16 @@
         log("Enter a username first.", true);
         return;
       }
-
       try {
-        const data = await api("/api/players", {
-          method: "POST",
-          body: { username }
-        });
-
+        const data = await api("/api/players", { method: "POST", body: { username } });
         state.playerId = data.player_id;
         state.username = data.username;
         savePlayerSession();
-
         el.playerIdView.textContent = state.playerId;
         el.playerNameView.textContent = state.username;
-
-        log(`Created player "${state.username}" with ID ${state.playerId}.`);
+        log(`Created player \"${state.username}\" with ID ${state.playerId}.`);
         await loadStats();
+        await loadOpenGames();
       } catch (err) {
         log(`Create player failed: ${err.message}`, true);
       }
@@ -678,10 +410,9 @@
 
     async function loadStats() {
       if (!state.playerId) {
-        log("No player exists in this tab yet.", true);
+        log("No player exists in this browser yet.", true);
         return;
       }
-
       try {
         const data = await api(`/api/players/${state.playerId}/stats`);
         el.stats.innerHTML = `
@@ -692,7 +423,6 @@
           <div class="stat">Hits<b>${data.hits}</b></div>
           <div class="stat">Accuracy<b>${(data.accuracy * 100).toFixed(1)}%</b></div>
         `;
-        log(`Loaded stats for player ${state.playerId}.`);
       } catch (err) {
         log(`Stats failed: ${err.message}`, true);
       }
@@ -703,87 +433,116 @@
         log("Create your player first.", true);
         return;
       }
-
       const gridSize = Number(el.gridSize.value);
       const maxPlayers = Number(el.maxPlayers.value);
-
       try {
         const data = await api("/api/games", {
           method: "POST",
-          body: {
-            creator_id: state.playerId,
-            grid_size: gridSize,
-            max_players: maxPlayers
-          }
+          body: { creator_id: state.playerId, grid_size: gridSize, max_players: maxPlayers }
         });
-
         state.gameId = data.game_id;
         state.gridSize = data.grid_size;
         state.game = null;
         state.boardData = null;
         state.moves = [];
         state.selectedShips = [];
-
         saveGameSession();
-
         el.currentGameId.textContent = state.gameId;
         el.gameIdInput.value = state.gameId;
         updateSelectionUI();
-
-        log(`Created match ${state.gameId}. Open another tab, create a different player, and join this game ID.`);
+        log(`Created match ${state.gameId}. Share this game ID or let other players join from the open games list.`);
         await refreshGame();
+        await loadOpenGames();
       } catch (err) {
         log(`Create match failed: ${err.message}`, true);
       }
     }
 
-    async function joinGame() {
+    async function joinGame(gameIdArg = null) {
       if (!state.playerId) {
         log("Create your player first.", true);
         return;
       }
-
-      const gameId = Number(el.gameIdInput.value);
+      const gameId = Number(gameIdArg ?? el.gameIdInput.value);
       if (!gameId) {
-        log("Enter a game ID to join.", true);
+        log("Enter a game ID or click Join on an open game.", true);
         return;
       }
-
       try {
         const data = await api(`/api/games/${gameId}/join`, {
           method: "POST",
           body: { player_id: state.playerId }
         });
-
         state.gameId = data.game_id;
         saveGameSession();
-
         el.currentGameId.textContent = state.gameId;
+        el.gameIdInput.value = state.gameId;
         log(`Joined match ${state.gameId} as player ${state.playerId}.`);
         await refreshGame();
+        await loadOpenGames();
       } catch (err) {
         log(`Join match failed: ${err.message}`, true);
       }
     }
 
-    async function refreshGame() {
-      if (!state.gameId) {
-        renderScreens();
+    async function loadOpenGames() {
+      try {
+        const data = await api("/api/games");
+        state.openGames = normalizeGamesResponse(data);
+        renderOpenGames();
+      } catch (err) {
+        el.gamesList.innerHTML = `<div class="game-item">Could not load games: ${err.message}</div>`;
+        log(`Open games failed: ${err.message}`, true);
+      }
+    }
+
+    function renderOpenGames() {
+      const games = state.openGames;
+      if (!games.length) {
+        el.gamesList.innerHTML = `<div class="game-item">No open games returned by /api/games yet.</div>`;
         return;
       }
+      el.gamesList.innerHTML = games.map(game => {
+        const gameId = game.game_id ?? game.id;
+        const status = game.status ?? "unknown";
+        const activePlayers = game.active_players ?? game.player_count ?? 0;
+        const maxPlayers = game.max_players ?? game.maxPlayers ?? "?";
+        const gridSize = game.grid_size ?? game.gridSize ?? "?";
+        const full = Number(activePlayers) >= Number(maxPlayers);
+        const joinDisabled = !state.playerId || full || status === "finished";
+        return `
+          <div class="game-item">
+            <div><strong>Game ${gameId}</strong> <span class="pill ${status === 'playing' ? 'playing' : status === 'finished' ? 'finished' : 'waiting'}">${status}</span></div>
+            <div class="meta">Grid ${gridSize}x${gridSize} • Players ${activePlayers}/${maxPlayers}</div>
+            <div class="row" style="margin-top:10px;">
+              <button class="secondary" onclick="selectGameId(${gameId})">Select</button>
+              <button ${joinDisabled ? 'disabled' : ''} onclick="joinGame(${gameId})">Join</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
 
+    function selectGameId(gameId) {
+      el.gameIdInput.value = gameId;
+      log(`Selected game ${gameId}.`);
+    }
+
+    async function refreshGame() {
+      if (!state.gameId) {
+        renderPanels();
+        return;
+      }
       try {
         const game = await api(`/api/games/${state.gameId}`);
         state.game = game;
-        state.gridSize = game.grid_size;
+        state.gridSize = game.grid_size ?? state.gridSize;
         saveGameSession();
-
         el.currentGameId.textContent = state.gameId;
-
         await loadBoard();
         await loadMoves();
-
-        renderScreens();
+        renderPanels();
+        await loadOpenGames();
       } catch (err) {
         log(`Refresh failed: ${err.message}`, true);
       }
@@ -791,12 +550,9 @@
 
     async function loadBoard() {
       if (!state.gameId || !state.playerId) return;
-
       try {
         state.boardData = await api(`/api/test/games/${state.gameId}/board/${state.playerId}`, {
-          headers: {
-            "X-Test-Password": TEST_PASSWORD
-          }
+          headers: { "X-Test-Password": TEST_PASSWORD }
         });
       } catch (err) {
         state.boardData = null;
@@ -806,10 +562,9 @@
 
     async function loadMoves() {
       if (!state.gameId) return;
-
       try {
         const data = await api(`/api/games/${state.gameId}/moves`);
-        state.moves = data.moves || [];
+        state.moves = Array.isArray(data?.moves) ? data.moves : [];
         renderMoves();
       } catch (err) {
         log(`Move history failed: ${err.message}`, true);
@@ -821,92 +576,91 @@
       return Array.isArray(state.boardData.ships) && state.boardData.ships.length >= 3;
     }
 
-    function renderScreens() {
-      el.screenNoGame.classList.add("hidden");
-      el.screenWaitingOpponent.classList.add("hidden");
-      el.screenSetup.classList.add("hidden");
-      el.screenGame.classList.add("hidden");
-      el.placementCard.classList.remove("hidden");
-
-      if (!state.gameId || !state.game) {
-        el.screenNoGame.classList.remove("hidden");
-        el.placementCard.classList.add("hidden");
-        return;
-      }
-
-      const activePlayers = state.game.active_players || 0;
-      const maxPlayers = 2;
-      const inWaitingForOpponent = state.game.status === "waiting_setup" && activePlayers < maxPlayers;
-
-      if (inWaitingForOpponent) {
-        el.waitingGameId.textContent = state.gameId;
-        el.waitingPlayers.textContent = activePlayers;
-        el.screenWaitingOpponent.classList.remove("hidden");
-        el.placementCard.classList.add("hidden");
-        return;
-      }
-
-      if (state.game.status === "waiting_setup") {
-        el.screenSetup.classList.remove("hidden");
-        renderSetupSummary();
-        renderSetupBoard();
-        return;
-      }
-
-      el.placementCard.classList.add("hidden");
-      el.screenGame.classList.remove("hidden");
+    function renderPanels() {
+      renderStatusBanner();
+      renderSetupSummary();
       renderGameSummary();
-      renderMyBoard();
-      renderEnemyBoard();
+      renderSetupBoard();
+      renderAllBoards();
+      const inSetup = Boolean(state.game && state.game.status === "waiting_setup");
+      el.placementCard.classList.toggle("hidden", !inSetup || playerHasPlacedShips());
+      el.setupCard.classList.toggle("hidden", !inSetup);
+    }
+
+    function renderStatusBanner() {
+      el.statusBanner.className = "banner wait";
+      if (!state.game) {
+        el.statusBanner.textContent = "Create or join a match to begin.";
+        return;
+      }
+      const winnerId = getWinnerId();
+      const meEliminated = getPlayers().some(p => p.player_id === state.playerId && isPlayerEliminated(p));
+      const myTurn = state.game.status === "playing" && state.game.current_turn_player_id === state.playerId;
+
+      if (state.game.status === "finished" || winnerId !== null) {
+        if (winnerId === state.playerId) {
+          el.statusBanner.className = "banner win";
+          el.statusBanner.textContent = `You won Game ${state.game.game_id}.`;
+        } else {
+          el.statusBanner.className = "banner lose";
+          el.statusBanner.textContent = `Game ${state.game.game_id} is finished. Winner: Player ${winnerId ?? 'unknown'}.`;
+        }
+      } else if (meEliminated) {
+        el.statusBanner.className = "banner lose";
+        el.statusBanner.textContent = "You have been eliminated. You can still watch the rest of the game.";
+      } else if (myTurn) {
+        el.statusBanner.className = "banner turn";
+        el.statusBanner.textContent = "It is your turn.";
+      } else {
+        el.statusBanner.className = "banner wait";
+        el.statusBanner.textContent = state.game.status === "waiting_setup" ? "Waiting for all players to place ships." : `Waiting for Player ${state.game.current_turn_player_id}.`;
+      }
     }
 
     function renderSetupSummary() {
-      const playersHtml = (state.game.players || []).map(p => {
+      if (!state.game) {
+        el.setupSummary.textContent = "Join a game to start setup.";
+        return;
+      }
+      const playersHtml = getPlayers().map(p => {
         const me = p.player_id === state.playerId ? " (you)" : "";
-        return `<div class="pill">Player ${p.player_id}${me} • Ships Remaining: ${p.ships_remaining}</div>`;
+        const status = isPlayerEliminated(p) ? "Eliminated" : `${p.ships_remaining} ships left`;
+        return `<div class="pill ${isPlayerEliminated(p) ? 'eliminated' : ''}">Player ${p.player_id}${me} • ${status}</div>`;
       }).join("");
-
       el.setupSummary.innerHTML = `
         <div class="pill waiting">Setup Phase</div>
         <div class="pill">Game ${state.game.game_id}</div>
         <div class="pill">${state.game.grid_size}x${state.game.grid_size}</div>
         <div class="pill">Players Joined: ${state.game.active_players}</div>
-        <div style="margin-top:10px;"><strong>Your Player ID:</strong> ${state.playerId}</div>
-        <div><strong>Your Ships Placed:</strong> ${playerHasPlacedShips() ? "Yes" : "No"}</div>
-        <div style="margin-top:10px;">${playersHtml || "No players yet."}</div>
+        <div style="margin-top:10px;"><strong>Your Ships Placed:</strong> ${playerHasPlacedShips() ? 'Yes' : 'No'}</div>
+        <div style="margin-top:10px;">${playersHtml || 'No players yet.'}</div>
       `;
     }
 
     function renderGameSummary() {
-      const statusClass =
-        state.game.status === "playing" ? "playing" :
-        state.game.status === "finished" ? "finished" : "waiting";
-
-      const isMyTurn =
-        state.game.status === "playing" &&
-        state.game.current_turn_player_id === state.playerId;
-
-      const playersHtml = (state.game.players || []).map(p => {
-        const me = p.player_id === state.playerId ? " (you)" : "";
-        return `<div class="pill">Player ${p.player_id}${me} • Ships Remaining: ${p.ships_remaining}</div>`;
-      }).join("");
-
-      let statusLine = "Waiting";
-      if (state.game.status === "playing") {
-        statusLine = isMyTurn ? "Your turn" : "Opponent's turn";
-      } else if (state.game.status === "finished") {
-        statusLine = "Match finished";
+      if (!state.game) {
+        el.gameSummary.textContent = "No game selected yet.";
+        return;
       }
-
+      const statusClass = state.game.status === "playing" ? "playing" : state.game.status === "finished" ? "finished" : "waiting";
+      const winnerId = getWinnerId();
+      const playersHtml = getPlayers().map(p => {
+        const me = p.player_id === state.playerId ? " (you)" : "";
+        const isWinner = winnerId === p.player_id;
+        const eliminated = isPlayerEliminated(p);
+        const extraClass = isWinner ? "winner" : eliminated ? "eliminated" : "";
+        const label = isWinner ? "Winner" : eliminated ? "Eliminated" : `${p.ships_remaining} ships left`;
+        return `<div class="pill ${extraClass}">Player ${p.player_id}${me} • ${label}</div>`;
+      }).join("");
       el.gameSummary.innerHTML = `
         <div class="pill ${statusClass}">${state.game.status}</div>
         <div class="pill">Game ${state.game.game_id}</div>
         <div class="pill">${state.game.grid_size}x${state.game.grid_size}</div>
         <div class="pill">Moves: ${state.game.total_moves}</div>
-        <div style="margin-top:10px;"><strong>Your Player ID:</strong> ${state.playerId}</div>
-        <div><strong>Current Turn:</strong> ${state.game.current_turn_player_id ?? "None"}</div>
-        <div><strong>Status:</strong> ${statusLine}</div>
-        <div style="margin-top:10px;">${playersHtml || "No players found."}</div>
+        <div style="margin-top:10px;"><strong>Your Player ID:</strong> ${state.playerId ?? 'None'}</div>
+        <div><strong>Current Turn:</strong> ${state.game.current_turn_player_id ?? 'None'}</div>
+        <div><strong>Winner:</strong> ${winnerId ? `Player ${winnerId}` : 'Not decided yet'}</div>
+        <div style="margin-top:10px;">${playersHtml || 'No players found.'}</div>
       `;
     }
 
@@ -915,15 +669,16 @@
         el.moves.innerHTML = `<div class="move">No moves yet.</div>`;
         return;
       }
-
-      el.moves.innerHTML = state.moves.map(move => `
-        <div class="move">
-          <strong>#${move.move_number}</strong> —
-          Player ${move.player_id}${move.player_id === state.playerId ? " (you)" : ""}
-          fired at (${move.row}, ${move.col}) → <strong>${move.result}</strong><br>
-          <span class="small">${move.timestamp}</span>
-        </div>
-      `).join("");
+      el.moves.innerHTML = state.moves.map(move => {
+        const targetText = move.target_player_id ? ` at Player ${move.target_player_id}` : "";
+        return `
+          <div class="move">
+            <strong>#${move.move_number}</strong> — Player ${move.player_id}${move.player_id === state.playerId ? ' (you)' : ''}
+            fired${targetText} at (${move.row}, ${move.col}) → <strong>${move.result}</strong><br>
+            <span class="small">${move.timestamp}</span>
+          </div>
+        `;
+      }).join("");
     }
 
     function toggleShipCell(r, c) {
@@ -931,14 +686,11 @@
         log("You can only select ships during setup.", true);
         return;
       }
-
       if (playerHasPlacedShips()) {
         log("You already placed your ships.", true);
         return;
       }
-
       const key = `${r},${c}`;
-
       if (state.selectedShips.includes(key)) {
         state.selectedShips = state.selectedShips.filter(x => x !== key);
       } else {
@@ -948,7 +700,6 @@
         }
         state.selectedShips.push(key);
       }
-
       updateSelectionUI();
       renderSetupBoard();
     }
@@ -958,26 +709,19 @@
         log("You need a player and a match first.", true);
         return;
       }
-
       if (state.selectedShips.length !== 3) {
         log("Select exactly 3 cells first.", true);
         return;
       }
-
       const ships = state.selectedShips.map(k => {
         const [row, col] = k.split(",").map(Number);
         return { row, col };
       });
-
       try {
         await api(`/api/games/${state.gameId}/place`, {
           method: "POST",
-          body: {
-            player_id: state.playerId,
-            ships
-          }
+          body: { player_id: state.playerId, ships }
         });
-
         state.selectedShips = [];
         updateSelectionUI();
         log("Ships placed successfully.");
@@ -987,40 +731,29 @@
       }
     }
 
-    async function fireAt(r, c) {
+    async function fireAt(targetPlayerId, row, col) {
       if (!state.game || !state.gameId || !state.playerId) {
         log("Join a match first.", true);
         return;
       }
-
       if (state.game.status !== "playing") {
         log("The match is not in playing state yet.", true);
         return;
       }
-
       if (state.game.current_turn_player_id !== state.playerId) {
         log("It is not your turn.", true);
         return;
       }
-
       try {
-        const data = await api(`/api/games/${state.gameId}/fire`, {
-          method: "POST",
-          body: {
-            player_id: state.playerId,
-            row: r,
-            col: c
-          }
-        });
-
-        log(`Fired at (${r}, ${c}) → ${data.result}.`);
-
+        const body = { player_id: state.playerId, row, col };
+        if (targetPlayerId) body.target_player_id = targetPlayerId;
+        const data = await api(`/api/games/${state.gameId}/fire`, { method: "POST", body });
+        log(`Fired at Player ${targetPlayerId ?? '?'} (${row}, ${col}) → ${data.result}.`);
         if (data.winner_id) {
           log(`Match finished. Winner: Player ${data.winner_id}.`);
         } else if (data.next_player_id) {
           log(`Next turn: Player ${data.next_player_id}.`);
         }
-
         await refreshGame();
       } catch (err) {
         log(`Fire failed: ${err.message}`, true);
@@ -1030,27 +763,24 @@
     function getIncomingShotSets() {
       const hits = new Set();
       const misses = new Set();
-
       if (state.boardData) {
         (state.boardData.hits || []).forEach(([r, c]) => hits.add(`${r},${c}`));
         (state.boardData.misses || []).forEach(([r, c]) => misses.add(`${r},${c}`));
       }
-
       return { hits, misses };
     }
 
-    function getOutgoingShotSets() {
+    function getOutgoingShotSets(targetPlayerId) {
       const hits = new Set();
       const misses = new Set();
-
       state.moves.forEach(move => {
-        if (move.player_id === state.playerId) {
-          const key = `${move.row},${move.col}`;
-          if (move.result === "hit") hits.add(key);
-          else misses.add(key);
-        }
+        if (move.player_id !== state.playerId) return;
+        const inferredTarget = move.target_player_id ?? (getOpponentPlayers().length === 1 ? getOpponentPlayers()[0].player_id : null);
+        if (targetPlayerId !== null && inferredTarget !== null && Number(inferredTarget) !== Number(targetPlayerId)) return;
+        const key = `${move.row},${move.col}`;
+        if (move.result === "hit") hits.add(key);
+        else misses.add(key);
       });
-
       return { hits, misses };
     }
 
@@ -1058,12 +788,10 @@
       const board = document.createElement("div");
       board.className = "board";
       board.style.gridTemplateColumns = `repeat(${size + 1}, 34px)`;
-
       for (let r = -1; r < size; r++) {
         for (let c = -1; c < size; c++) {
           const cell = document.createElement("div");
           cell.className = "cell";
-
           if (r === -1 && c === -1) {
             cell.classList.add("label");
           } else if (r === -1) {
@@ -1074,67 +802,57 @@
             cell.textContent = r;
           } else {
             options.decorate?.(cell, r, c);
-
             if (clickHandler && !cell.classList.contains("disabled")) {
               cell.classList.add("clickable");
               cell.onclick = () => clickHandler(r, c);
             }
           }
-
           board.appendChild(cell);
         }
       }
-
       return board;
     }
 
     function renderSetupBoard() {
       const size = state.gridSize || 8;
       const placedShipSet = new Set();
-
       if (state.boardData) {
         (state.boardData.ships || []).forEach(ship => {
           (ship.coordinates || []).forEach(([r, c]) => placedShipSet.add(`${r},${c}`));
         });
       }
-
       const board = buildBoard(size, (!playerHasPlacedShips() ? toggleShipCell : null), {
         decorate(cell, r, c) {
           const key = `${r},${c}`;
           const selected = state.selectedShips.includes(key);
-
-          if (placedShipSet.has(key)) {
-            cell.classList.add("ship");
-          } else if (selected) {
+          if (placedShipSet.has(key)) cell.classList.add("ship");
+          else if (selected) {
             cell.classList.add("selected");
             cell.textContent = "S";
           }
-
-          if (playerHasPlacedShips()) {
-            cell.classList.add("disabled");
-          }
+          if (playerHasPlacedShips()) cell.classList.add("disabled");
         }
       });
-
       el.myBoardWrapSetup.innerHTML = "";
       el.myBoardWrapSetup.appendChild(board);
     }
 
-    function renderMyBoard() {
+    function renderMyBoardCard() {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `<h3>Your Board</h3><div class="small">Shows your ships and shots received.</div>`;
+      const wrap = document.createElement("div");
       const size = state.gridSize || 8;
       const shipSet = new Set();
       const { hits, misses } = getIncomingShotSets();
-
       if (state.boardData) {
         (state.boardData.ships || []).forEach(ship => {
           (ship.coordinates || []).forEach(([r, c]) => shipSet.add(`${r},${c}`));
         });
       }
-
       const board = buildBoard(size, null, {
         decorate(cell, r, c) {
           const key = `${r},${c}`;
-
           if (shipSet.has(key)) cell.classList.add("ship");
           if (hits.has(key)) {
             cell.classList.remove("ship");
@@ -1144,29 +862,31 @@
             cell.classList.add("miss");
             cell.textContent = "•";
           }
-
           cell.classList.add("disabled");
         }
       });
-
-      el.myBoardWrap.innerHTML = "";
-      el.myBoardWrap.appendChild(board);
+      wrap.appendChild(board);
+      card.appendChild(wrap);
+      return card;
     }
 
-    function renderEnemyBoard() {
+    function renderOpponentBoardCard(opponent) {
+      const card = document.createElement("div");
+      card.className = "card";
+      const opponentId = opponent.player_id;
+      const eliminated = isPlayerEliminated(opponent);
+      const myTurn = state.game && state.game.status === "playing" && state.game.current_turn_player_id === state.playerId && !eliminated;
+      const { hits, misses } = getOutgoingShotSets(opponentId);
+
+      card.innerHTML = `
+        <h3>Player ${opponentId}${eliminated ? ' <span class="pill eliminated">Eliminated</span>' : ''}</h3>
+        <div class="small">${eliminated ? 'This opponent is out of the game.' : 'Click a square on this board when it is your turn.'}</div>
+      `;
       const size = state.gridSize || 8;
-      const { hits, misses } = getOutgoingShotSets();
-
-      const myTurn =
-        state.game &&
-        state.game.status === "playing" &&
-        state.game.current_turn_player_id === state.playerId;
-
-      const board = buildBoard(size, myTurn ? fireAt : null, {
+      const board = buildBoard(size, myTurn ? ((r, c) => fireAt(opponentId, r, c)) : null, {
         decorate(cell, r, c) {
           const key = `${r},${c}`;
           const alreadyFired = hits.has(key) || misses.has(key);
-
           if (hits.has(key)) {
             cell.classList.add("hit");
             cell.textContent = "X";
@@ -1174,23 +894,32 @@
             cell.classList.add("miss");
             cell.textContent = "•";
           }
-
-          if (!myTurn || alreadyFired) {
-            cell.classList.add("disabled");
-          }
+          if (!myTurn || alreadyFired) cell.classList.add("disabled");
         }
       });
+      card.appendChild(board);
+      return card;
+    }
 
-      el.enemyBoardWrap.innerHTML = "";
-      el.enemyBoardWrap.appendChild(board);
+    function renderAllBoards() {
+      el.boardsGrid.innerHTML = "";
+      el.boardsGrid.appendChild(renderMyBoardCard());
+      if (!state.game) return;
+      getOpponentPlayers().forEach(opponent => {
+        el.boardsGrid.appendChild(renderOpponentBoardCard(opponent));
+      });
     }
 
     function startPolling() {
       if (state.pollId) clearInterval(state.pollId);
-
       state.pollId = setInterval(() => {
         if (state.gameId) refreshGame();
-      }, 4000);
+      }, 3000);
+    }
+
+    function startLobbyPolling() {
+      if (state.lobbyPollId) clearInterval(state.lobbyPollId);
+      state.lobbyPollId = setInterval(loadOpenGames, 5000);
     }
 
     function init() {
@@ -1201,15 +930,15 @@
       el.gridSize.value = state.gridSize || 8;
       el.currentGameId.textContent = state.gameId ?? "None";
       if (state.gameId) el.gameIdInput.value = state.gameId;
-
       updateSelectionUI();
       pingApi();
-      renderScreens();
-
+      renderPanels();
+      renderOpenGames();
       if (state.playerId) loadStats();
+      loadOpenGames();
       if (state.gameId) refreshGame();
-
       startPolling();
+      startLobbyPolling();
     }
 
     init();
