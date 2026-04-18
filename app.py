@@ -543,7 +543,42 @@ def list_players():
 @app.get("/api/games")
 def list_games():
     try:
-        return jsonify({"games": []}), 200
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        g.game_id,
+                        g.status,
+                        g.grid_size,
+                        g.max_players,
+                        g.current_turn_index,
+                        g.created_at,
+                        COUNT(gp.player_id) AS active_players
+                    FROM games g
+                    LEFT JOIN game_players gp ON gp.game_id = g.game_id
+                    GROUP BY g.game_id, g.status, g.grid_size, g.max_players, g.current_turn_index, g.created_at
+                    HAVING g.status = %s AND COUNT(gp.player_id) < g.max_players
+                    ORDER BY g.created_at DESC, g.game_id DESC
+                    """,
+                    (WAITING_STATUS,)
+                )
+                games = cur.fetchall()
+
+        return jsonify({
+            "games": [
+                {
+                    "game_id": game["game_id"],
+                    "status": game["status"],
+                    "grid_size": game["grid_size"],
+                    "max_players": game["max_players"],
+                    "current_turn_index": game["current_turn_index"],
+                    "active_players": game["active_players"],
+                    "created_at": game["created_at"].isoformat().replace("+00:00", "Z") if game["created_at"] else None,
+                }
+                for game in games
+            ]
+        }), 200
     except Exception as ex:
         print(f"List games error: {ex}")
         return error_response("internal_error", "Failed to list games", 500)
@@ -780,6 +815,7 @@ def get_game(game_id):
                 response = {
                     "game_id": game["game_id"],
                     "grid_size": game["grid_size"],
+                    "max_players": game["max_players"],
                     "status": game["status"],
                     "players": game_players_detail(cur, game_id),
                     "current_turn_index": game["current_turn_index"],
@@ -948,11 +984,18 @@ def fire(game_id):
         player_id = data.get("playerId")
     player_id = resolve_player_id(player_id)
 
+    target_player_id = data.get("target_player_id")
+    if target_player_id is None:
+        target_player_id = data.get("targetPlayerId")
+    target_player_id = resolve_player_id(target_player_id)
+
     row = data.get("row")
     col = data.get("col")
 
     if not is_valid_int_id(player_id):
         return error_response("bad_request", "player_id is required", 400)
+    if target_player_id is not None and not is_valid_int_id(target_player_id):
+        return error_response("bad_request", "target_player_id must be a positive integer", 400)
     if not isinstance(row, int) or not isinstance(col, int):
         return error_response("bad_request", "row and col are required", 400)
 
@@ -982,20 +1025,19 @@ def fire(game_id):
                 if membership["turn_order"] != game["current_turn_index"]:
                     return error_response("forbidden", "Not your turn", 403)
 
-                target_player_id = None
                 result = "miss"
                 turn_rows = get_turn_order_rows(cur, game_id)
+                opponent_ids = [row_player["player_id"] for row_player in turn_rows if row_player["player_id"] != player_id]
 
-                # First determine which opponent board this shot is aimed at.
-                # In a 2-player game, this is simply the other player.
-                for row_player in turn_rows:
-                    other_id = row_player["player_id"]
-                    if other_id != player_id:
-                        target_player_id = other_id
-                        break
-
-                if target_player_id is None:
+                if not opponent_ids:
                     return error_response("bad_request", "No valid target player found", 400)
+
+                if target_player_id is not None:
+                    if target_player_id not in opponent_ids:
+                        return error_response("bad_request", "Target player is not a valid opponent in this game", 400)
+                else:
+                    # Backwards-compatible fallback for older 2-player clients.
+                    target_player_id = opponent_ids[0]
 
                 # Now check if THIS attacker already fired at THIS target player's board cell.
                 cur.execute(
@@ -1139,7 +1181,7 @@ def get_moves(game_id):
 
                 cur.execute(
                     """
-                    SELECT attacker_player_id, row_index, col_index, result, created_at
+                    SELECT attacker_player_id, target_player_id, row_index, col_index, result, created_at
                     FROM shots
                     WHERE game_id = %s
                     ORDER BY created_at, shot_id
@@ -1154,6 +1196,7 @@ def get_moves(game_id):
                 {
                     "move_number": index,
                     "player_id": shot["attacker_player_id"],
+                    "target_player_id": shot["target_player_id"],
                     "row": shot["row_index"],
                     "col": shot["col_index"],
                     "result": shot["result"],
