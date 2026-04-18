@@ -947,7 +947,7 @@
     }
 
     function getMaxPlayers() {
-      return state.game?.max_players ?? state.game?.maxPlayers ?? Number(el.maxPlayers.value) || 2;
+      return state.game?.max_players ?? state.game?.maxPlayers ?? (Number(el.maxPlayers.value) || 2);
     }
 
     function getPlayers() {
