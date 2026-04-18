@@ -1043,7 +1043,7 @@
           method: 'POST',
           body: JSON.stringify({
             player_id: state.player.player_id,
-            ships: picks.map(([row, col]) => [row, col]),
+            ships: picks.map(([row, col]) => ({ row, col })),
           }),
         });
         state.placementSelections[gameId] = [];
