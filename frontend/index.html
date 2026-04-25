@@ -74,15 +74,15 @@
       mask-image: linear-gradient(to bottom, black, transparent 75%);
     }
 
-    .app { position: relative; z-index: 1; min-height: 100vh; padding: 22px; }
+    .app { position: relative; z-index: 1; min-height: 100vh; padding: 14px; }
     .topbar {
       max-width: 1480px;
-      margin: 0 auto 16px;
+      margin: 0 auto 10px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 16px 18px;
+      padding: 12px 14px;
       border: 1px solid var(--line);
       border-radius: 28px;
       background: linear-gradient(180deg, var(--surface2), var(--surface));
@@ -91,7 +91,7 @@
     }
     .brand { display:flex; align-items:center; gap:14px; }
     .logo {
-      width: 48px; height: 48px; border-radius: 17px;
+      width: 42px; height: 42px; border-radius: 15px;
       background: linear-gradient(135deg, var(--accent), var(--accent2));
       display: grid; place-items:center; box-shadow: 0 12px 30px rgba(79,163,255,.28);
       font-size: 24px;
@@ -105,8 +105,8 @@
       border-radius: 16px;
       color: var(--text);
       background: rgba(255,255,255,.055);
-      min-height: 44px;
-      padding: 11px 14px;
+      min-height: 38px;
+      padding: 9px 12px;
       font: inherit;
       outline: none;
     }
@@ -154,34 +154,35 @@
       font-size: 12px; font-weight: 850; color: var(--muted);
     }
 
-    .game-list { display: grid; gap: 10px; max-height: 360px; overflow:auto; padding-right: 4px; }
+    .game-list { display: grid; gap: 10px; max-height: 360px; overflow:auto; padding-right: 4px; scrollbar-width: none; }
+    .game-list::-webkit-scrollbar { display:none; }
     .game-card { display:flex; justify-content:space-between; align-items:center; gap:10px; padding: 14px; border-radius: 18px; background: rgba(255,255,255,.055); border:1px solid var(--line); }
     .game-card strong { display:block; margin-bottom: 4px; }
 
-    .game-shell { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 14px; height: calc(100vh - 126px); min-height: 760px; }
-    .game-header { display:grid; grid-template-columns: 1fr auto; gap: 16px; align-items:center; padding: 18px 20px; }
-    .status-strip { display:flex; flex-wrap:wrap; gap: 9px; margin-top: 10px; }
-    .game-main { display:grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; min-height: 0; }
-    .side-rail { min-height:0; overflow:auto; }
-    .arena { min-height:0; overflow:auto; padding: 18px; }
-    .boards { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items:start; }
-    .board-card { border: 1px solid var(--line); border-radius: 24px; padding: 16px; background: rgba(255,255,255,.055); box-shadow: var(--shadow2); }
+    .game-shell { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; height: calc(100vh - 96px); min-height: 0; overflow: hidden; }
+    .game-header { display:grid; grid-template-columns: 1fr auto; gap: 10px; align-items:center; padding: 12px 14px; }
+    .status-strip { display:flex; flex-wrap:wrap; gap: 7px; margin-top: 8px; }
+    .game-main { display:grid; grid-template-columns: 260px minmax(0, 1fr); gap: 10px; min-height: 0; overflow: hidden; }
+    .side-rail { min-height:0; overflow: hidden; }
+    .arena { min-height:0; overflow: hidden; padding: 10px; }
+    .boards { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; align-items:start; height: 100%; overflow: hidden; }
+    .board-card { border: 1px solid var(--line); border-radius: 18px; padding: 9px; background: rgba(255,255,255,.055); box-shadow: var(--shadow2); min-width: 0; overflow: hidden; }
     .board-card.viewer { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); }
     .board-card.current { box-shadow: 0 0 0 2px rgba(34,197,94,.22), var(--shadow2); }
-    .board-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom: 12px; }
-    .board-title strong { display:block; font-size: 18px; }
+    .board-head { display:flex; align-items:flex-start; justify-content:space-between; gap:7px; margin-bottom: 8px; }
+    .board-title strong { display:block; font-size: 15px; }
     .board-title span { display:block; margin-top:4px; color: var(--muted); font-size:12px; font-weight:700; }
-    .grid { display:grid; gap: 4px; grid-template-columns: repeat(var(--grid-size), 1fr); }
+    .grid { display:grid; gap: 2px; grid-template-columns: repeat(var(--grid-size), minmax(0, 1fr)); width: 100%; max-width: min(100%, 320px); margin: 0 auto; }
     .cell {
       aspect-ratio: 1;
-      border-radius: 9px;
+      border-radius: 6px;
       display:grid; place-items:center;
       border: 1px solid var(--line);
       background: linear-gradient(180deg, rgba(18, 48, 86, .65), rgba(11, 31, 61, .72));
       color: transparent;
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 1000;
-      min-width: 20px;
+      min-width: 0;
       position: relative;
       overflow: hidden;
     }
@@ -189,7 +190,7 @@
     .cell.clickable { cursor: crosshair; }
     .cell.clickable:hover { outline: 2px solid var(--accent); transform: scale(1.04); z-index: 2; }
     .cell.ship, .cell.preview { background: linear-gradient(135deg, var(--ship), var(--ship2)); color: white; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
-    .cell.sunk { background: linear-gradient(135deg, var(--hit), #991b1b); color: white; }
+    .cell.sunk, .cell.hit { background: linear-gradient(135deg, var(--hit), #991b1b); color: white; }
     .cell.miss { background: linear-gradient(135deg, var(--miss), #334155); color: white; }
     .cell.preview { opacity: .75; }
     .cell.preview.bad { background: linear-gradient(135deg, var(--danger), #7f1d1d); }
@@ -201,19 +202,39 @@
     .ship-dots { display:flex; gap:3px; }
     .ship-dots i { width:13px; height:13px; border-radius:5px; background: linear-gradient(135deg, var(--ship), var(--ship2)); display:block; }
 
-    .bottom-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; min-height: 210px; max-height: 250px; }
-    .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 10px; overflow:auto; max-height: 178px; padding-right: 4px; }
-    .stat-card { padding: 13px; border-radius: 17px; border:1px solid var(--line); background: rgba(255,255,255,.055); }
+    .bottom-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; min-height: 135px; max-height: 170px; overflow: hidden; }
+    .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(145px,1fr)); gap: 7px; overflow: auto; max-height: 104px; padding-right: 0; scrollbar-width: none; }
+    .stats-grid::-webkit-scrollbar { display: none; }
+    .stat-card { padding: 8px; border-radius: 13px; border:1px solid var(--line); background: rgba(255,255,255,.055); }
     .stat-card strong { display:block; margin-bottom: 8px; }
     .stat-line { display:grid; grid-template-columns: 1fr auto; gap:8px; color: var(--muted); font-size: 13px; margin-top: 5px; }
-    .history { display:grid; gap: 8px; overflow:auto; max-height: 178px; padding-right: 4px; }
-    .move { display:flex; justify-content:space-between; gap:10px; align-items:center; padding: 10px 12px; border-radius: 14px; border:1px solid var(--line); background: rgba(255,255,255,.055); font-size: 13px; }
+    .history { display:grid; gap: 6px; overflow: auto; max-height: 104px; padding-right: 0; scrollbar-width: none; }
+    .history::-webkit-scrollbar { display: none; }
+    .move { display:flex; justify-content:space-between; gap:8px; align-items:center; padding: 7px 9px; border-radius: 14px; border:1px solid var(--line); background: rgba(255,255,255,.055); font-size: 13px; }
     .move b.hit { color: #fecaca; }
     html[data-theme="light"] .move b.hit { color: #dc2626; }
     .move b.miss { color: var(--muted); }
 
     .toast { position: fixed; right: 20px; bottom: 20px; z-index: 20; display:grid; gap: 10px; }
     .toast div { max-width: 420px; padding: 13px 15px; border-radius: 16px; background: var(--surface2); border:1px solid var(--line2); box-shadow: var(--shadow2); font-weight: 800; }
+
+
+    body.game-active { overflow: hidden; }
+    .game-page-no-scroll { overflow: hidden; }
+    html[data-theme="light"] .cell.ship,
+    html[data-theme="light"] .cell.preview { background: linear-gradient(135deg, #1d4ed8, #0891b2); color: white; }
+    html[data-theme="light"] .cell.sunk,
+    html[data-theme="light"] .cell.hit { background: linear-gradient(135deg, #dc2626, #7f1d1d); color: white; }
+    html[data-theme="light"] .cell.miss { background: linear-gradient(135deg, #64748b, #334155); color: white; }
+    .panel-inner { padding: 14px; }
+    .ship-choice { min-height: 48px; padding: 8px 10px; }
+    .ship-dots i { width: 10px; height: 10px; border-radius: 4px; }
+    .side-rail .panel-inner { gap: 8px; }
+    .side-rail .tiny { font-size: 11px; }
+    .bottom-grid .panel-inner { padding: 10px; }
+    .stat-line { font-size: 11px; margin-top: 2px; }
+    .stat-card strong { margin-bottom: 4px; font-size: 13px; }
+    .section-title { margin-bottom: 8px; }
 
     @media (max-width: 980px) {
       .home-grid, .game-main, .bottom-grid { grid-template-columns: 1fr; }
@@ -374,6 +395,7 @@
     function showPage(name) {
       $('homePage').classList.toggle('active', name === 'home');
       $('gamePage').classList.toggle('active', name === 'game');
+      document.body.classList.toggle('game-active', name === 'game');
     }
 
     function updateBadges() {
@@ -519,7 +541,7 @@
         for (let c = 0; c < size; c++) {
           const val = board.grid[r][c];
           const plannedClass = planned.has(`${r},${c}`) ? ' ship' : '';
-          const symbol = val === 'sunk' ? '✕' : val === 'miss' ? '•' : val === 'ship' || plannedClass ? '■' : '';
+          const symbol = (val === 'sunk' || val === 'hit') ? '✕' : val === 'miss' ? '•' : val === 'ship' || plannedClass ? '■' : '';
           const attrs = canPlace ? `data-place="1" data-row="${r}" data-col="${c}"` : canShoot && val === 'empty' ? `data-shot="1" data-target="${board.player_id}" data-row="${r}" data-col="${c}"` : '';
           cells += `<div class="cell ${val}${plannedClass} ${attrs ? 'clickable' : ''}" ${attrs}>${symbol}</div>`;
         }
@@ -596,11 +618,38 @@
       refreshGame(true);
     }
 
+    function applyLocalShot(target_player_id, row, col, result, response) {
+      if (!state.boards) return;
+      const target = state.boards.boards.find(b => Number(b.player_id) === Number(target_player_id));
+      if (target && target.grid?.[row]) {
+        target.grid[row][col] = result === 'hit' ? 'sunk' : 'miss';
+        if (result === 'hit') target.ships_remaining = Math.max(0, Number(target.ships_remaining || 0) - 1);
+      }
+
+      const nextPlayerId = response?.next_player_id || null;
+      state.boards.your_turn = Number(nextPlayerId) === Number(state.playerId);
+      state.boards.current_turn_player_id = nextPlayerId;
+      if (response?.game_status) state.boards.status = response.game_status;
+      if (response?.winner_id) state.boards.winner_id = response.winner_id;
+
+      const moveNumber = state.moves.length ? Math.max(...state.moves.map(m => Number(m.move_number || 0))) + 1 : 1;
+      state.moves.push({
+        move_number: moveNumber,
+        player_id: state.playerId,
+        target_player_id: Number(target_player_id),
+        row,
+        col,
+        result
+      });
+      renderGame();
+    }
+
     async function fireShot(target_player_id, row, col) {
       try {
         const data = await api(`/api/games/${state.gameId}/fire`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, target_player_id: Number(target_player_id), row, col }) });
+        applyLocalShot(target_player_id, row, col, data.result, data);
         toast(data.result === 'hit' ? 'Direct hit!' : 'Miss.');
-        refreshGame(true);
+        setTimeout(() => refreshGame(true), 450);
       } catch (err) { toast(err.message); }
     }
 
