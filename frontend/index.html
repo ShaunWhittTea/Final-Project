@@ -1,80 +1,652 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Live Battleship</title>
+  <title>FleetCommand Battleship</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
-    :root{
-      --bg:#06111f;--bg2:#0b1b33;--panel:rgba(13,26,48,.92);--panel2:rgba(18,36,64,.9);
-      --line:rgba(148,163,184,.18);--text:#eef6ff;--muted:#9fb4d1;--blue:#58a6ff;--blue2:#2563eb;
-      --green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--cell:#0f213a;--ship:#2563eb;--miss:#334155;
-      --shadow:0 24px 60px rgba(0,0,0,.32);--radius:22px;
+    :root {
+      --bg: #06101f;
+      --bg2: #0a1930;
+      --surface: rgba(13, 24, 44, .88);
+      --surface2: rgba(19, 34, 61, .92);
+      --card: rgba(15, 28, 52, .82);
+      --line: rgba(156, 184, 224, .18);
+      --line2: rgba(156, 184, 224, .34);
+      --text: #eff7ff;
+      --muted: #9db2d2;
+      --soft: #6f86aa;
+      --accent: #4fa3ff;
+      --accent2: #7c3aed;
+      --success: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --ship: #2563eb;
+      --ship2: #06b6d4;
+      --hit: #ef4444;
+      --miss: #64748b;
+      --shadow: 0 28px 80px rgba(0,0,0,.42);
+      --shadow2: 0 14px 38px rgba(0,0,0,.24);
+      --radius: 24px;
     }
-    *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);background:radial-gradient(circle at 20% 0%,rgba(88,166,255,.18),transparent 30%),radial-gradient(circle at 90% 10%,rgba(34,197,94,.12),transparent 25%),linear-gradient(180deg,var(--bg),var(--bg2));}
-    .layout{display:grid;grid-template-columns:340px 1fr;min-height:100vh}.side{padding:22px;border-right:1px solid var(--line);background:rgba(4,10,22,.62);backdrop-filter:blur(18px);position:sticky;top:0;height:100vh;overflow:auto}.main{padding:28px;min-width:0}.brand{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:18px}.brand h1{font-size:34px;line-height:1;margin:0;letter-spacing:-.04em}.brand small{display:block;color:var(--muted);margin-top:7px}.dot{width:10px;height:10px;border-radius:50%;background:var(--red);box-shadow:0 0 20px var(--red);display:inline-block}.dot.on{background:var(--green);box-shadow:0 0 20px var(--green)}.status-pill{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:8px 11px;color:var(--muted);font-size:12px;font-weight:800;background:rgba(15,23,42,.72)}
-    .card{border:1px solid var(--line);background:linear-gradient(180deg,var(--panel),rgba(9,20,38,.94));border-radius:var(--radius);padding:18px;margin-bottom:16px;box-shadow:var(--shadow);position:relative;overflow:hidden}.card:before{content:"";position:absolute;inset:0 0 auto;height:1px;background:linear-gradient(90deg,rgba(255,255,255,.16),transparent)}h2,h3{margin:0 0 12px;letter-spacing:-.03em}.stack{display:grid;gap:10px}.row{display:flex;gap:10px}.row>*{flex:1;min-width:0}label{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}input,select,button{width:100%;min-height:44px;border-radius:14px;border:1px solid var(--line);padding:11px 13px;background:#071629;color:var(--text);font-size:14px}button{cursor:pointer;font-weight:900;background:linear-gradient(135deg,var(--blue),var(--blue2));border:0;box-shadow:0 12px 28px rgba(37,99,235,.28);transition:.15s transform,.15s opacity}button:hover{transform:translateY(-1px)}button:disabled{opacity:.45;cursor:not-allowed;transform:none}.secondary{background:rgba(15,30,54,.9);border:1px solid var(--line);box-shadow:none}.danger{background:linear-gradient(135deg,#ef4444,#991b1b)}.tiny{font-size:12px;color:var(--muted);line-height:1.45}.msg{min-height:20px;font-size:13px;color:var(--muted)}.msg.good{color:#86efac}.msg.bad{color:#fca5a5}.msg.warn{color:#fcd34d}
-    .hero{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;margin-bottom:18px}.hero h2{font-size:42px;margin:0}.hero p{color:var(--muted);margin:8px 0 0}.stats{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:12px}.stat{border:1px solid var(--line);border-radius:18px;background:rgba(10,23,43,.78);padding:14px}.stat b{display:block;font-size:24px}.stat span{color:var(--muted);font-size:12px;text-transform:uppercase;font-weight:900;letter-spacing:.08em}.boards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}.board-card{border:1px solid var(--line);border-radius:22px;background:rgba(10,22,40,.82);padding:16px;box-shadow:var(--shadow)}.board-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}.badges{display:flex;gap:7px;flex-wrap:wrap}.badge{font-size:11px;font-weight:900;padding:6px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:rgba(15,23,42,.8)}.badge.turn{color:#bfdbfe;border-color:rgba(88,166,255,.45)}.badge.me{color:#86efac;border-color:rgba(34,197,94,.4)}.badge.dead{color:#fca5a5;border-color:rgba(239,68,68,.4)}.grid{display:grid;gap:5px;touch-action:manipulation}.cell{aspect-ratio:1;border-radius:10px;border:1px solid rgba(148,163,184,.14);background:var(--cell);display:grid;place-items:center;color:#dbeafe;font-weight:900;font-size:12px;transition:.1s transform,.1s border-color,.1s background}.cell.clickable{cursor:pointer}.cell.clickable:hover{transform:scale(1.04);border-color:var(--blue);box-shadow:0 0 0 3px rgba(88,166,255,.13)}.cell.ship{background:linear-gradient(135deg,var(--ship),#1e40af)}.cell.miss{background:var(--miss);color:#94a3b8}.cell.sunk{background:linear-gradient(135deg,#ef4444,#7f1d1d)}.cell.pending{outline:3px solid rgba(245,158,11,.8);transform:scale(.94)}.open-game,.log-item{border:1px solid var(--line);border-radius:15px;background:rgba(8,18,34,.75);padding:12px;margin-bottom:9px}.open-game strong{display:block}.log{max-height:260px;overflow:auto}.log-item{font-size:12px;color:var(--muted)}.hidden{display:none!important}@media(max-width:900px){.layout{grid-template-columns:1fr}.side{position:relative;height:auto}.hero{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+
+    html[data-theme="light"] {
+      --bg: #eef5ff;
+      --bg2: #f8fbff;
+      --surface: rgba(255,255,255,.88);
+      --surface2: rgba(255,255,255,.94);
+      --card: rgba(255,255,255,.84);
+      --line: rgba(41, 65, 102, .13);
+      --line2: rgba(41, 65, 102, .22);
+      --text: #0b1930;
+      --muted: #50617d;
+      --soft: #7b8aa1;
+      --accent: #1769e0;
+      --accent2: #7c3aed;
+      --ship: #2563eb;
+      --shadow: 0 28px 80px rgba(37, 99, 235, .13);
+      --shadow2: 0 14px 38px rgba(15, 23, 42, .10);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 8%, rgba(79,163,255,.32), transparent 30%),
+        radial-gradient(circle at 92% 0%, rgba(124,58,237,.25), transparent 30%),
+        radial-gradient(circle at 65% 90%, rgba(34,197,94,.13), transparent 30%),
+        linear-gradient(135deg, var(--bg), var(--bg2));
+      letter-spacing: -.01em;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(148,163,184,.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148,163,184,.06) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, black, transparent 75%);
+    }
+
+    .app { position: relative; z-index: 1; min-height: 100vh; padding: 22px; }
+    .topbar {
+      max-width: 1480px;
+      margin: 0 auto 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 18px;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      box-shadow: var(--shadow2);
+      backdrop-filter: blur(18px);
+    }
+    .brand { display:flex; align-items:center; gap:14px; }
+    .logo {
+      width: 48px; height: 48px; border-radius: 17px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: grid; place-items:center; box-shadow: 0 12px 30px rgba(79,163,255,.28);
+      font-size: 24px;
+    }
+    h1 { margin: 0; font-size: clamp(24px, 3vw, 38px); letter-spacing: -.055em; line-height: 1; }
+    .subtitle { margin-top: 5px; color: var(--muted); font-weight: 650; font-size: 13px; }
+
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    button, input, select {
+      border: 1px solid var(--line2);
+      border-radius: 16px;
+      color: var(--text);
+      background: rgba(255,255,255,.055);
+      min-height: 44px;
+      padding: 11px 14px;
+      font: inherit;
+      outline: none;
+    }
+    html[data-theme="light"] button, html[data-theme="light"] input, html[data-theme="light"] select { background: rgba(255,255,255,.8); }
+    input::placeholder { color: var(--soft); }
+    button { cursor: pointer; font-weight: 850; transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease; }
+    button:hover:not(:disabled) { transform: translateY(-1px); border-color: color-mix(in srgb, var(--accent) 55%, var(--line2)); box-shadow: 0 10px 24px rgba(79,163,255,.18); }
+    button:disabled { cursor:not-allowed; opacity:.48; }
+    .btn-primary { border: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; }
+    .btn-danger { border-color: rgba(239,68,68,.5); color: #fecaca; background: rgba(239,68,68,.12); }
+    html[data-theme="light"] .btn-danger { color: #991b1b; }
+    .btn-small { min-height: 36px; padding: 8px 11px; border-radius: 12px; font-size: 13px; }
+
+    .page { max-width: 1480px; margin: 0 auto; display: none; }
+    .page.active { display: block; }
+    .home-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 16px; align-items: start; }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      box-shadow: var(--shadow2);
+      backdrop-filter: blur(18px);
+      overflow: hidden;
+    }
+    .panel-inner { padding: 20px; }
+    .hero { padding: 34px; min-height: 450px; display: flex; flex-direction: column; justify-content: space-between; }
+    .hero h2 { margin: 0; font-size: clamp(38px, 5vw, 72px); letter-spacing: -.075em; line-height: .95; }
+    .hero p { max-width: 720px; color: var(--muted); font-size: 17px; line-height: 1.6; font-weight: 600; }
+    .feature-row { display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+    .feature { padding: 16px; border-radius: 20px; background: rgba(255,255,255,.055); border: 1px solid var(--line); }
+    .feature b { display:block; margin-bottom: 7px; }
+    .feature span { color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+    .stack { display: grid; gap: 12px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .row > * { flex: 1 1 0; min-width: 120px; }
+    .section-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    h2, h3, h4 { margin: 0; letter-spacing: -.035em; }
+    h3 { font-size: 20px; }
+    .muted { color: var(--muted); }
+    .tiny { font-size: 12px; line-height: 1.45; }
+    .pill {
+      display: inline-flex; align-items:center; gap: 7px; padding: 7px 10px;
+      border-radius: 999px; border: 1px solid var(--line2); background: rgba(255,255,255,.06);
+      font-size: 12px; font-weight: 850; color: var(--muted);
+    }
+
+    .game-list { display: grid; gap: 10px; max-height: 360px; overflow:auto; padding-right: 4px; }
+    .game-card { display:flex; justify-content:space-between; align-items:center; gap:10px; padding: 14px; border-radius: 18px; background: rgba(255,255,255,.055); border:1px solid var(--line); }
+    .game-card strong { display:block; margin-bottom: 4px; }
+
+    .game-shell { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 14px; height: calc(100vh - 126px); min-height: 760px; }
+    .game-header { display:grid; grid-template-columns: 1fr auto; gap: 16px; align-items:center; padding: 18px 20px; }
+    .status-strip { display:flex; flex-wrap:wrap; gap: 9px; margin-top: 10px; }
+    .game-main { display:grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; min-height: 0; }
+    .side-rail { min-height:0; overflow:auto; }
+    .arena { min-height:0; overflow:auto; padding: 18px; }
+    .boards { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items:start; }
+    .board-card { border: 1px solid var(--line); border-radius: 24px; padding: 16px; background: rgba(255,255,255,.055); box-shadow: var(--shadow2); }
+    .board-card.viewer { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); }
+    .board-card.current { box-shadow: 0 0 0 2px rgba(34,197,94,.22), var(--shadow2); }
+    .board-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom: 12px; }
+    .board-title strong { display:block; font-size: 18px; }
+    .board-title span { display:block; margin-top:4px; color: var(--muted); font-size:12px; font-weight:700; }
+    .grid { display:grid; gap: 4px; grid-template-columns: repeat(var(--grid-size), 1fr); }
+    .cell {
+      aspect-ratio: 1;
+      border-radius: 9px;
+      display:grid; place-items:center;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(18, 48, 86, .65), rgba(11, 31, 61, .72));
+      color: transparent;
+      font-size: 12px;
+      font-weight: 1000;
+      min-width: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    html[data-theme="light"] .cell { background: linear-gradient(180deg, rgba(218,232,255,.95), rgba(191,218,255,.95)); }
+    .cell.clickable { cursor: crosshair; }
+    .cell.clickable:hover { outline: 2px solid var(--accent); transform: scale(1.04); z-index: 2; }
+    .cell.ship, .cell.preview { background: linear-gradient(135deg, var(--ship), var(--ship2)); color: white; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+    .cell.sunk { background: linear-gradient(135deg, var(--hit), #991b1b); color: white; }
+    .cell.miss { background: linear-gradient(135deg, var(--miss), #334155); color: white; }
+    .cell.preview { opacity: .75; }
+    .cell.preview.bad { background: linear-gradient(135deg, var(--danger), #7f1d1d); }
+
+    .ship-picker { display:grid; gap:10px; }
+    .ship-choice { text-align:left; min-height:58px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .ship-choice.active { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,163,255,.16); }
+    .ship-choice.done { opacity:.55; }
+    .ship-dots { display:flex; gap:3px; }
+    .ship-dots i { width:13px; height:13px; border-radius:5px; background: linear-gradient(135deg, var(--ship), var(--ship2)); display:block; }
+
+    .bottom-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; min-height: 210px; max-height: 250px; }
+    .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 10px; overflow:auto; max-height: 178px; padding-right: 4px; }
+    .stat-card { padding: 13px; border-radius: 17px; border:1px solid var(--line); background: rgba(255,255,255,.055); }
+    .stat-card strong { display:block; margin-bottom: 8px; }
+    .stat-line { display:grid; grid-template-columns: 1fr auto; gap:8px; color: var(--muted); font-size: 13px; margin-top: 5px; }
+    .history { display:grid; gap: 8px; overflow:auto; max-height: 178px; padding-right: 4px; }
+    .move { display:flex; justify-content:space-between; gap:10px; align-items:center; padding: 10px 12px; border-radius: 14px; border:1px solid var(--line); background: rgba(255,255,255,.055); font-size: 13px; }
+    .move b.hit { color: #fecaca; }
+    html[data-theme="light"] .move b.hit { color: #dc2626; }
+    .move b.miss { color: var(--muted); }
+
+    .toast { position: fixed; right: 20px; bottom: 20px; z-index: 20; display:grid; gap: 10px; }
+    .toast div { max-width: 420px; padding: 13px 15px; border-radius: 16px; background: var(--surface2); border:1px solid var(--line2); box-shadow: var(--shadow2); font-weight: 800; }
+
+    @media (max-width: 980px) {
+      .home-grid, .game-main, .bottom-grid { grid-template-columns: 1fr; }
+      .game-shell { height: auto; min-height: 0; }
+      .game-main, .arena, .side-rail { overflow: visible; }
+      .hero { min-height: auto; padding: 24px; }
+      .feature-row { grid-template-columns: 1fr; }
+      .topbar { align-items:flex-start; flex-direction:column; }
+      .controls { justify-content:flex-start; }
+    }
   </style>
 </head>
 <body>
-  <div class="layout">
-    <aside class="side">
-      <div class="brand"><div><h1>Battleship</h1><small>real-time Socket.IO client</small></div><div class="status-pill"><span id="socketDot" class="dot"></span><span id="socketText">offline</span></div></div>
-      <section class="card"><h3>1. Player</h3><div class="stack"><label>Username</label><input id="username" placeholder="ex: jack_stivers"><button id="createPlayerBtn">Create / Load Player</button><div id="playerMsg" class="msg"></div></div></section>
-      <section class="card"><h3>2. Game</h3><div class="stack"><div class="row"><div><label>Grid</label><select id="gridSize"><option>5</option><option>6</option><option>7</option><option selected>8</option><option>9</option><option>10</option><option>12</option><option>15</option></select></div><div><label>Players</label><select id="maxPlayers"><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option></select></div></div><button id="createGameBtn">Create Game</button><div class="row"><input id="joinGameId" placeholder="Game ID"><button id="joinGameBtn" class="secondary">Join</button></div><div id="gameMsg" class="msg"></div></div></section>
-      <section class="card"><h3>Open Games</h3><div id="openGames" class="tiny">No games loaded yet.</div><button id="refreshGamesBtn" class="secondary">Refresh Open Games</button></section>
-      <section class="card"><h3>3. Place Ships</h3><p class="tiny">Click exactly 3 cells on your own board, then place ships. Ships are single-cell ships for this project.</p><button id="placeShipsBtn">Place Selected Ships</button><button id="clearShipsBtn" class="secondary">Clear Selection</button><div id="shipMsg" class="msg"></div></section>
-      <section class="card"><h3>Tools</h3><button id="resetBtn" class="danger">Reset Database</button><div id="toolMsg" class="msg"></div></section>
-    </aside>
-    <main class="main">
-      <section class="hero"><div><h2 id="headline">Create or join a live game.</h2><p id="subhead">After you join, this page subscribes to your game room. Shots and turn changes appear instantly on every connected browser.</p></div><button id="manualSyncBtn" class="secondary">Manual Sync</button></section>
-      <section class="stats"><div class="stat"><span>Player</span><b id="statPlayer">—</b></div><div class="stat"><span>Game</span><b id="statGame">—</b></div><div class="stat"><span>Status</span><b id="statStatus">—</b></div><div class="stat"><span>Turn</span><b id="statTurn">—</b></div></section>
-      <section class="card"><div class="board-head"><h3>Boards</h3><div class="badges"><span class="badge">O ship</span><span class="badge">× hit</span><span class="badge">• miss</span></div></div><div id="boards" class="boards"><div class="tiny">No active game yet.</div></div></section>
-      <section class="card"><h3>Live Events</h3><div id="log" class="log"><div class="log-item">Waiting for socket connection...</div></div></section>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">⚓</div>
+        <div>
+          <h1>FleetCommand</h1>
+          <div class="subtitle">Professional real-time multiplayer Battleship</div>
+        </div>
+      </div>
+      <div class="controls">
+        <span class="pill" id="socketStatus">● Connecting</span>
+        <span class="pill" id="playerBadge">No player</span>
+        <button class="btn-small" id="themeBtn">Light mode</button>
+        <button class="btn-small" id="homeBtn">Home</button>
+      </div>
+    </header>
+
+    <main id="homePage" class="page active">
+      <div class="home-grid">
+        <section class="panel hero">
+          <div>
+            <span class="pill">Live WebSocket fleet combat</span>
+            <h2>Command your fleet. Sink every rival.</h2>
+            <p>Create a player, launch or join an open game, then move into a focused battle room with large boards, live turns, ship placement, stats, and move history.</p>
+            <div class="feature-row">
+              <div class="feature"><b>Real-time updates</b><span>Shots, joins, turns, and placements refresh automatically for every player.</span></div>
+              <div class="feature"><b>True fleet sizes</b><span>Place a 2-long patrol boat, 3-long destroyer, and 5-long carrier.</span></div>
+              <div class="feature"><b>Clean game room</b><span>Setup happens on Home; battle details stay inside the game page.</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="stack">
+          <div class="panel"><div class="panel-inner stack">
+            <div class="section-title"><h3>1. Player</h3><span class="pill" id="savedPlayerPill">Not signed in</span></div>
+            <input id="usernameInput" placeholder="Username, e.g. admiral_jack" maxlength="30" />
+            <button class="btn-primary" id="createPlayerBtn">Create / Use Player</button>
+            <div class="tiny muted">Usernames can contain letters, numbers, and underscores.</div>
+          </div></div>
+
+          <div class="panel"><div class="panel-inner stack">
+            <div class="section-title"><h3>2. Create Game</h3><span class="pill">Private by ID or open lobby</span></div>
+            <div class="row">
+              <label class="stack tiny muted">Grid size<select id="gridSizeInput"><option>8</option><option>10</option><option>12</option><option>15</option></select></label>
+              <label class="stack tiny muted">Players<select id="maxPlayersInput"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label>
+            </div>
+            <button class="btn-primary" id="createGameBtn">Create Game</button>
+          </div></div>
+
+          <div class="panel"><div class="panel-inner stack">
+            <div class="section-title"><h3>3. Join Game</h3><button class="btn-small" id="refreshGamesBtn">Refresh</button></div>
+            <div class="row"><input id="joinGameIdInput" placeholder="Enter game ID" /><button id="joinByIdBtn">Join ID</button></div>
+            <div class="game-list" id="openGamesList"></div>
+          </div></div>
+        </section>
+      </div>
+    </main>
+
+    <main id="gamePage" class="page">
+      <div class="game-shell">
+        <section class="panel game-header">
+          <div>
+            <h2 id="gameTitle">Game</h2>
+            <div class="status-strip" id="gameStatusStrip"></div>
+          </div>
+          <div class="controls"><button id="refreshGameBtn">Refresh</button><button class="btn-danger" id="leaveGameBtn">Leave room</button></div>
+        </section>
+
+        <section class="game-main">
+          <aside class="panel side-rail"><div class="panel-inner stack">
+            <div class="section-title"><h3>Shipyard</h3><span class="pill" id="placementPill">Setup</span></div>
+            <div class="tiny muted">Select a ship, choose direction, then click your board. Ships cannot overlap and must stay in bounds.</div>
+            <div class="row"><button class="btn-small" id="horizontalBtn">Horizontal</button><button class="btn-small" id="verticalBtn">Vertical</button></div>
+            <div class="ship-picker" id="shipPicker"></div>
+            <div class="row"><button id="clearShipsBtn">Clear</button><button class="btn-primary" id="submitShipsBtn">Submit fleet</button></div>
+            <div id="setupHelp" class="tiny muted"></div>
+          </div></aside>
+
+          <section class="panel arena"><div class="boards" id="boardsArea"></div></section>
+        </section>
+
+        <section class="bottom-grid">
+          <div class="panel"><div class="panel-inner">
+            <div class="section-title"><h3>Player Stats</h3><span class="pill">Live game</span></div>
+            <div class="stats-grid" id="statsArea"></div>
+          </div></div>
+          <div class="panel"><div class="panel-inner">
+            <div class="section-title"><h3>Move History</h3><span class="pill" id="moveCountPill">0 moves</span></div>
+            <div class="history" id="historyArea"></div>
+          </div></div>
+        </section>
+      </div>
     </main>
   </div>
-<script>
-const API = location.origin;
-const socket = io(API, { transports: ["websocket", "polling"] });
-const $ = id => document.getElementById(id);
-const state = { playerId:null, username:null, gameId:null, board:null, selectedShips:[], pendingShot:null };
 
-function save(){ localStorage.setItem("battleshipLive", JSON.stringify({playerId:state.playerId, username:state.username, gameId:state.gameId})); }
-function load(){ try{ const s=JSON.parse(localStorage.getItem("battleshipLive")||"{}"); Object.assign(state,s); if(s.username) $('username').value=s.username; if(s.gameId) $('joinGameId').value=s.gameId; }catch{} }
-function msg(id,text,type=""){ const el=$(id); el.textContent=text||""; el.className="msg "+type; }
-function log(text){ const div=document.createElement('div'); div.className='log-item'; div.textContent=new Date().toLocaleTimeString()+" — "+text; $('log').prepend(div); }
-async function api(path, options={}){ const res=await fetch(API+path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options}); const data=await res.json().catch(()=>({})); if(!res.ok) throw new Error(data.message||data.error||`Request failed (${res.status})`); return data; }
+  <div class="toast" id="toast"></div>
 
-function connectRooms(){ socket.emit('join_lobby'); if(state.gameId && state.playerId) socket.emit('join_game_room',{game_id:Number(state.gameId), player_id:Number(state.playerId)}); }
-function requestUpdate(){ if(state.gameId&&state.playerId) socket.emit('request_game_update',{game_id:Number(state.gameId), player_id:Number(state.playerId)}); }
-function setHeader(){ $('statPlayer').textContent=state.username?`${state.username} (#${state.playerId})`:'—'; $('statGame').textContent=state.gameId?`#${state.gameId}`:'—'; if(!state.board){$('statStatus').textContent='—';$('statTurn').textContent='—';return;} $('statStatus').textContent=state.board.status; const cur=state.board.boards?.find(b=>b.player_id===state.board.current_turn_player_id); $('statTurn').textContent=cur?cur.username:'—'; if(state.board.status==='playing') $('headline').textContent=state.board.your_turn?'Your turn — fire now.':'Waiting for opponent.'; else if(state.board.status==='waiting_setup') $('headline').textContent='Setup phase — place ships.'; else if(state.board.status==='finished') $('headline').textContent=state.board.winner_id===state.playerId?'You won!':'Game finished.'; }
+  <script>
+    const SHIPS = [
+      { type: 'patrol', name: 'Patrol Boat', size: 2 },
+      { type: 'destroyer', name: 'Destroyer', size: 3 },
+      { type: 'carrier', name: 'Carrier', size: 5 }
+    ];
 
-function renderBoard(payload){ state.board=payload; state.gameId=payload.game_id; save(); setHeader(); const wrap=$('boards'); wrap.innerHTML=''; payload.boards.forEach(board=>{ const card=document.createElement('div'); card.className='board-card'; const canShoot=payload.status==='playing' && payload.your_turn && !board.is_viewer && !board.eliminated; const canPlace=payload.status==='waiting_setup' && board.is_viewer && !board.placed; card.innerHTML=`<div class="board-head"><div><h3>${escapeHtml(board.username)}</h3><div class="tiny">Player #${board.player_id} · ${board.ships_remaining} ships left</div></div><div class="badges">${board.is_viewer?'<span class="badge me">You</span>':''}${board.is_current_turn?'<span class="badge turn">Turn</span>':''}${board.eliminated?'<span class="badge dead">Eliminated</span>':''}${board.placed?'<span class="badge">Ready</span>':'<span class="badge">Setup</span>'}</div></div>`; const grid=document.createElement('div'); grid.className='grid'; grid.style.gridTemplateColumns=`repeat(${payload.grid_size},1fr)`; board.grid.forEach((row,r)=>row.forEach((cell,c)=>{ const btn=document.createElement('button'); btn.type='button'; btn.className=`cell ${cell}`; btn.dataset.r=r; btn.dataset.c=c; btn.dataset.owner=board.player_id; btn.textContent=symbol(cell); if(state.pendingShot && state.pendingShot.target===board.player_id && state.pendingShot.row===r && state.pendingShot.col===c) btn.classList.add('pending'); if(canShoot && cell==='empty'){ btn.classList.add('clickable'); btn.onclick=()=>fireShot(board.player_id,r,c,btn); } else if(canPlace){ btn.classList.add('clickable'); if(state.selectedShips.some(s=>s.row===r&&s.col===c)){ btn.classList.add('ship'); btn.textContent='O'; } btn.onclick=()=>toggleShip(r,c); } grid.appendChild(btn); })); card.appendChild(grid); wrap.appendChild(card); }); }
-function symbol(cell){ return cell==='ship'?'O':cell==='miss'?'•':cell==='sunk'?'×':''; }
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    const state = {
+      playerId: Number(localStorage.getItem('fc_player_id')) || null,
+      username: localStorage.getItem('fc_username') || '',
+      gameId: Number(localStorage.getItem('fc_game_id')) || null,
+      boards: null,
+      moves: [],
+      plannedShips: [],
+      activeShip: 'patrol',
+      orientation: 'horizontal',
+      socket: null,
+      refreshTimer: null
+    };
 
-function toggleShip(row,col){ const i=state.selectedShips.findIndex(s=>s.row===row&&s.col===col); if(i>=0) state.selectedShips.splice(i,1); else { if(state.selectedShips.length>=3){ msg('shipMsg','You can only choose 3 ships.','warn'); return; } state.selectedShips.push({row,col}); } msg('shipMsg',`${state.selectedShips.length}/3 ships selected`,state.selectedShips.length===3?'good':''); renderBoard(state.board); }
-async function fireShot(target,row,col,btn){ if(!state.gameId||!state.playerId) return; state.pendingShot={target,row,col}; btn.classList.add('pending'); btn.disabled=true; log(`Firing at player #${target}, row ${row+1}, col ${col+1}`); try{ const data=await api(`/api/games/${state.gameId}/fire`,{method:'POST',body:JSON.stringify({player_id:Number(state.playerId),target_player_id:target,row,col})}); log(`Shot was a ${data.result.toUpperCase()}.`); requestUpdate(); }catch(e){ msg('gameMsg',e.message,'bad'); log(e.message); state.pendingShot=null; requestUpdate(); } }
+    const $ = id => document.getElementById(id);
 
-async function refreshOpenGames(){ try{ const data=await api('/api/games'); const box=$('openGames'); box.innerHTML=''; if(!data.games?.length){ box.textContent='No open games right now.'; return; } data.games.forEach(g=>{ const div=document.createElement('div'); div.className='open-game'; div.innerHTML=`<strong>Game #${g.game_id}</strong><span>${g.active_players}/${g.max_players} players · ${g.grid_size}×${g.grid_size}</span>`; const b=document.createElement('button'); b.textContent='Join This Game'; b.className='secondary'; b.onclick=()=>{ $('joinGameId').value=g.game_id; joinGame(); }; div.appendChild(b); box.appendChild(div); }); }catch(e){ $('openGames').textContent=e.message; } }
-async function createPlayer(){ const username=$('username').value.trim(); if(!username) return msg('playerMsg','Enter a username.','bad'); try{ const data=await api('/api/players',{method:'POST',body:JSON.stringify({username})}); state.playerId=data.player_id; state.username=data.username||username; save(); setHeader(); msg('playerMsg',`Loaded ${state.username} (#${state.playerId})`,'good'); connectRooms(); }catch(e){ msg('playerMsg',e.message,'bad'); } }
-async function createGame(){ if(!state.playerId) return msg('gameMsg','Create a player first.','bad'); try{ const data=await api('/api/games',{method:'POST',body:JSON.stringify({creator_id:Number(state.playerId),grid_size:Number($('gridSize').value),max_players:Number($('maxPlayers').value)})}); state.gameId=data.game_id; state.selectedShips=[]; save(); msg('gameMsg',`Created game #${state.gameId}`,'good'); connectRooms(); await refreshOpenGames(); requestUpdate(); }catch(e){ msg('gameMsg',e.message,'bad'); } }
-async function joinGame(){ if(!state.playerId) return msg('gameMsg','Create a player first.','bad'); const gameId=Number($('joinGameId').value); if(!gameId) return msg('gameMsg','Enter a game ID.','bad'); try{ await api(`/api/games/${gameId}/join`,{method:'POST',body:JSON.stringify({player_id:Number(state.playerId)})}); state.gameId=gameId; state.selectedShips=[]; save(); msg('gameMsg',`Joined game #${gameId}`,'good'); connectRooms(); await refreshOpenGames(); requestUpdate(); }catch(e){ msg('gameMsg',e.message,'bad'); } }
-async function placeShips(){ if(!state.gameId||!state.playerId) return msg('shipMsg','Join a game first.','bad'); if(state.selectedShips.length!==3) return msg('shipMsg','Select exactly 3 ships on your own board.','bad'); try{ await api(`/api/games/${state.gameId}/place`,{method:'POST',body:JSON.stringify({player_id:Number(state.playerId),ships:state.selectedShips})}); msg('shipMsg','Ships placed. Waiting for everyone else.','good'); state.selectedShips=[]; requestUpdate(); }catch(e){ msg('shipMsg',e.message,'bad'); } }
-async function resetDb(){ try{ await api('/api/reset',{method:'POST',body:'{}'}); state.gameId=null; state.board=null; state.selectedShips=[]; save(); $('boards').innerHTML='<div class="tiny">No active game yet.</div>'; setHeader(); msg('toolMsg','Database reset.','good'); await refreshOpenGames(); }catch(e){ msg('toolMsg',e.message,'bad'); } }
+    function toast(message) {
+      const wrap = $('toast');
+      const el = document.createElement('div');
+      el.textContent = message;
+      wrap.appendChild(el);
+      setTimeout(() => el.remove(), 3600);
+    }
 
-socket.on('connect',()=>{ $('socketDot').classList.add('on'); $('socketText').textContent='live'; log('Socket connected.'); connectRooms(); });
-socket.on('disconnect',()=>{ $('socketDot').classList.remove('on'); $('socketText').textContent='offline'; log('Socket disconnected.'); });
-socket.on('open_games_changed',refreshOpenGames);
-socket.on('system_reset',()=>{ log('Database reset broadcast received.'); refreshOpenGames(); });
-socket.on('game_update',payload=>{ state.pendingShot=null; renderBoard(payload); const ev=payload.last_event; if(ev?.type==='shot_fired') log(`Player #${ev.attacker_player_id} fired at player #${ev.target_player_id}: ${ev.result}.`); });
-socket.on('game_public_update',payload=>{ if(Number(payload.game_id)===Number(state.gameId)) log(`Game #${payload.game_id} changed: ${payload.type||payload.status}`); });
-socket.on('game_error',e=>{ msg('gameMsg',e.message||'Socket error','bad'); log(e.message||'Socket error'); });
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+        ...options
+      });
+      let data = {};
+      try { data = await res.json(); } catch (_) {}
+      if (!res.ok) throw new Error(data.message || data.error || `Request failed (${res.status})`);
+      return data;
+    }
 
-$('createPlayerBtn').onclick=createPlayer; $('createGameBtn').onclick=createGame; $('joinGameBtn').onclick=joinGame; $('refreshGamesBtn').onclick=refreshOpenGames; $('placeShipsBtn').onclick=placeShips; $('clearShipsBtn').onclick=()=>{state.selectedShips=[]; msg('shipMsg','Selection cleared.'); if(state.board)renderBoard(state.board);}; $('manualSyncBtn').onclick=requestUpdate; $('resetBtn').onclick=resetDb;
-load(); setHeader(); refreshOpenGames(); connectRooms(); if(state.gameId&&state.playerId) requestUpdate();
-</script>
+    function setTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      localStorage.setItem('fc_theme', theme);
+      $('themeBtn').textContent = theme === 'dark' ? 'Light mode' : 'Dark mode';
+    }
+
+    function showPage(name) {
+      $('homePage').classList.toggle('active', name === 'home');
+      $('gamePage').classList.toggle('active', name === 'game');
+    }
+
+    function updateBadges() {
+      $('playerBadge').textContent = state.playerId ? `${state.username} #${state.playerId}` : 'No player';
+      $('savedPlayerPill').textContent = state.playerId ? `${state.username} #${state.playerId}` : 'Not signed in';
+    }
+
+    function setupSocket() {
+      if (!window.io) {
+        $('socketStatus').textContent = '● Offline fallback';
+        return;
+      }
+      state.socket = io({ transports: ['websocket', 'polling'] });
+      state.socket.on('connect', () => {
+        $('socketStatus').textContent = '● Live';
+        if (state.gameId) state.socket.emit('watch_game', { game_id: state.gameId });
+      });
+      state.socket.on('disconnect', () => $('socketStatus').textContent = '● Reconnecting');
+      state.socket.on('game_changed', data => {
+        if (Number(data.game_id) === Number(state.gameId)) refreshGame(false);
+      });
+      state.socket.on('open_games_changed', refreshOpenGames);
+    }
+
+    async function createPlayer() {
+      const username = $('usernameInput').value.trim();
+      if (!username) return toast('Enter a username first.');
+      const data = await api('/api/players', { method: 'POST', body: JSON.stringify({ username }) });
+      state.playerId = data.player_id;
+      state.username = data.username || username;
+      localStorage.setItem('fc_player_id', state.playerId);
+      localStorage.setItem('fc_username', state.username);
+      updateBadges();
+      toast(`Player ready: ${state.username}`);
+    }
+
+    async function createGame() {
+      if (!state.playerId) return toast('Create a player before creating a game.');
+      const grid_size = Number($('gridSizeInput').value);
+      const max_players = Number($('maxPlayersInput').value);
+      const data = await api('/api/games', { method: 'POST', body: JSON.stringify({ creator_id: state.playerId, grid_size, max_players }) });
+      enterGame(data.game_id);
+      toast(`Created game #${data.game_id}`);
+    }
+
+    async function joinGame(gameId) {
+      if (!state.playerId) return toast('Create a player before joining a game.');
+      await api(`/api/games/${gameId}/join`, { method: 'POST', body: JSON.stringify({ player_id: state.playerId }) });
+      enterGame(gameId);
+      toast(`Joined game #${gameId}`);
+    }
+
+    function enterGame(gameId) {
+      state.gameId = Number(gameId);
+      localStorage.setItem('fc_game_id', state.gameId);
+      state.plannedShips = [];
+      if (state.socket) state.socket.emit('watch_game', { game_id: state.gameId });
+      showPage('game');
+      renderShipPicker();
+      refreshGame(true);
+    }
+
+    async function refreshOpenGames() {
+      const list = $('openGamesList');
+      try {
+        const data = await api('/api/games');
+        const games = data.games || [];
+        if (!games.length) {
+          list.innerHTML = '<div class="tiny muted">No open games yet. Create one to start a lobby.</div>';
+          return;
+        }
+        list.innerHTML = games.map(g => `
+          <div class="game-card">
+            <div><strong>Game #${g.game_id}</strong><div class="tiny muted">${g.active_players}/${g.max_players} players · ${g.grid_size}×${g.grid_size}</div></div>
+            <button class="btn-small" data-join="${g.game_id}">Join</button>
+          </div>`).join('');
+        list.querySelectorAll('[data-join]').forEach(btn => btn.onclick = () => joinGame(btn.dataset.join));
+      } catch (err) { list.innerHTML = `<div class="tiny muted">Could not load games: ${err.message}</div>`; }
+    }
+
+    async function refreshGame(noToast) {
+      if (!state.gameId || !state.playerId) return;
+      try {
+        const [boards, moves] = await Promise.all([
+          api(`/api/games/${state.gameId}/boards?viewer_player_id=${state.playerId}`),
+          api(`/api/games/${state.gameId}/moves`)
+        ]);
+        state.boards = boards;
+        state.moves = moves.moves || [];
+        renderGame();
+      } catch (err) {
+        if (!noToast) toast(err.message);
+      }
+    }
+
+    function renderGame() {
+      const data = state.boards;
+      if (!data) return;
+      $('gameTitle').textContent = `Battle Room #${data.game_id}`;
+      const winner = data.winner_id ? playerName(data.winner_id) : null;
+      $('gameStatusStrip').innerHTML = `
+        <span class="pill">${data.status.replace('_', ' ')}</span>
+        <span class="pill">${data.grid_size}×${data.grid_size}</span>
+        <span class="pill">${data.boards.length}/${data.max_players} players</span>
+        <span class="pill">${data.your_turn ? 'Your turn' : data.current_turn_player_id ? `${playerName(data.current_turn_player_id)}\'s turn` : 'Waiting for fleets'}</span>
+        ${winner ? `<span class="pill">Winner: ${winner}</span>` : ''}`;
+      renderBoards();
+      renderStats();
+      renderHistory();
+      const viewerBoard = data.boards.find(b => b.is_viewer);
+      const canPlace = data.status === 'waiting_setup' && viewerBoard && !viewerBoard.placed;
+      $('placementPill').textContent = canPlace ? 'Place fleet' : viewerBoard?.placed ? 'Fleet submitted' : 'Locked';
+      $('submitShipsBtn').disabled = !canPlace || state.plannedShips.length !== SHIPS.length;
+      $('clearShipsBtn').disabled = !canPlace;
+      $('setupHelp').textContent = canPlace ? 'You need exactly three ships: length 2, length 3, and length 5.' : 'Your fleet is submitted or the game has already started.';
+    }
+
+    function playerName(id) {
+      const b = state.boards?.boards?.find(x => Number(x.player_id) === Number(id));
+      return b ? b.username : `Player ${id}`;
+    }
+
+    function renderBoards() {
+      const data = state.boards;
+      $('boardsArea').innerHTML = data.boards.map(board => boardHtml(board, data.grid_size)).join('');
+      $('boardsArea').querySelectorAll('[data-shot]').forEach(cell => {
+        cell.onclick = () => fireShot(cell.dataset.target, Number(cell.dataset.row), Number(cell.dataset.col));
+      });
+      $('boardsArea').querySelectorAll('[data-place]').forEach(cell => {
+        cell.onclick = () => placeShipAt(Number(cell.dataset.row), Number(cell.dataset.col));
+        cell.onmouseenter = () => previewShip(Number(cell.dataset.row), Number(cell.dataset.col));
+        cell.onmouseleave = clearPreview;
+      });
+    }
+
+    function boardHtml(board, size) {
+      const data = state.boards;
+      const canPlace = data.status === 'waiting_setup' && board.is_viewer && !board.placed;
+      const canShoot = data.status === 'playing' && data.your_turn && !board.is_viewer && !board.eliminated;
+      const planned = board.is_viewer ? plannedCellSet() : new Set();
+      let cells = '';
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const val = board.grid[r][c];
+          const plannedClass = planned.has(`${r},${c}`) ? ' ship' : '';
+          const symbol = val === 'sunk' ? '✕' : val === 'miss' ? '•' : val === 'ship' || plannedClass ? '■' : '';
+          const attrs = canPlace ? `data-place="1" data-row="${r}" data-col="${c}"` : canShoot && val === 'empty' ? `data-shot="1" data-target="${board.player_id}" data-row="${r}" data-col="${c}"` : '';
+          cells += `<div class="cell ${val}${plannedClass} ${attrs ? 'clickable' : ''}" ${attrs}>${symbol}</div>`;
+        }
+      }
+      return `<article class="board-card ${board.is_viewer ? 'viewer' : ''} ${board.is_current_turn ? 'current' : ''}">
+        <div class="board-head"><div class="board-title"><strong>${board.username}${board.is_viewer ? ' (You)' : ''}</strong><span>${board.placed ? 'Fleet ready' : 'Placing fleet'} · ${board.ships_remaining} cells afloat</span></div><span class="pill">${board.eliminated ? 'Eliminated' : board.is_current_turn ? 'Turn' : `#${board.turn_order + 1}`}</span></div>
+        <div class="grid" style="--grid-size:${size}">${cells}</div>
+      </article>`;
+    }
+
+    function renderShipPicker() {
+      $('shipPicker').innerHTML = SHIPS.map(ship => `
+        <button class="ship-choice" data-ship="${ship.type}">
+          <span><b>${ship.name}</b><span class="tiny muted">Length ${ship.size}</span></span>
+          <span class="ship-dots">${'<i></i>'.repeat(ship.size)}</span>
+        </button>`).join('');
+      $('shipPicker').querySelectorAll('[data-ship]').forEach(btn => btn.onclick = () => { state.activeShip = btn.dataset.ship; renderShipPicker(); });
+      updateShipPickerState();
+    }
+
+    function updateShipPickerState() {
+      $('shipPicker').querySelectorAll('[data-ship]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.ship === state.activeShip);
+        btn.classList.toggle('done', state.plannedShips.some(s => s.type === btn.dataset.ship));
+      });
+    }
+
+    function plannedCellSet(exceptType = null) {
+      const set = new Set();
+      state.plannedShips.filter(s => s.type !== exceptType).forEach(ship => ship.coordinates.forEach(([r,c]) => set.add(`${r},${c}`)));
+      return set;
+    }
+
+    function cellsForShip(row, col, shipType = state.activeShip) {
+      const ship = SHIPS.find(s => s.type === shipType);
+      return Array.from({length: ship.size}, (_, i) => state.orientation === 'horizontal' ? [row, col + i] : [row + i, col]);
+    }
+
+    function canPlaceCells(cells, shipType) {
+      const size = state.boards.grid_size;
+      const occupied = plannedCellSet(shipType);
+      return cells.every(([r,c]) => r >= 0 && r < size && c >= 0 && c < size && !occupied.has(`${r},${c}`));
+    }
+
+    function placeShipAt(row, col) {
+      const cells = cellsForShip(row, col);
+      if (!canPlaceCells(cells, state.activeShip)) return toast('That ship does not fit there.');
+      state.plannedShips = state.plannedShips.filter(s => s.type !== state.activeShip);
+      state.plannedShips.push({ type: state.activeShip, coordinates: cells });
+      const next = SHIPS.find(s => !state.plannedShips.some(p => p.type === s.type));
+      if (next) state.activeShip = next.type;
+      renderShipPicker();
+      renderGame();
+    }
+
+    function previewShip(row, col) {
+      clearPreview();
+      const cells = cellsForShip(row, col);
+      const ok = canPlaceCells(cells, state.activeShip);
+      document.querySelectorAll('[data-place]').forEach(el => {
+        if (cells.some(([r,c]) => Number(el.dataset.row) === r && Number(el.dataset.col) === c)) {
+          el.classList.add('preview');
+          if (!ok) el.classList.add('bad');
+        }
+      });
+    }
+    function clearPreview() { document.querySelectorAll('.preview').forEach(el => el.classList.remove('preview', 'bad')); }
+
+    async function submitShips() {
+      if (state.plannedShips.length !== SHIPS.length) return toast('Place all three ships first.');
+      await api(`/api/games/${state.gameId}/place`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, ships: state.plannedShips }) });
+      toast('Fleet submitted. Waiting for opponents.');
+      state.plannedShips = [];
+      refreshGame(true);
+    }
+
+    async function fireShot(target_player_id, row, col) {
+      try {
+        const data = await api(`/api/games/${state.gameId}/fire`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, target_player_id: Number(target_player_id), row, col }) });
+        toast(data.result === 'hit' ? 'Direct hit!' : 'Miss.');
+        refreshGame(true);
+      } catch (err) { toast(err.message); }
+    }
+
+    function renderStats() {
+      const players = state.boards.boards;
+      $('statsArea').innerHTML = players.map(p => {
+        const shots = state.moves.filter(m => Number(m.player_id) === Number(p.player_id));
+        const hits = shots.filter(m => m.result === 'hit').length;
+        const accuracy = shots.length ? Math.round((hits / shots.length) * 100) : 0;
+        return `<div class="stat-card"><strong>${p.username}${p.is_viewer ? ' (You)' : ''}</strong>
+          <div class="stat-line"><span>Status</span><b>${p.eliminated ? 'Eliminated' : p.placed ? 'Active' : 'Setup'}</b></div>
+          <div class="stat-line"><span>Ships afloat</span><b>${p.ships_remaining}</b></div>
+          <div class="stat-line"><span>Shots</span><b>${shots.length}</b></div>
+          <div class="stat-line"><span>Hits</span><b>${hits}</b></div>
+          <div class="stat-line"><span>Accuracy</span><b>${accuracy}%</b></div></div>`;
+      }).join('');
+    }
+
+    function renderHistory() {
+      $('moveCountPill').textContent = `${state.moves.length} moves`;
+      if (!state.moves.length) { $('historyArea').innerHTML = '<div class="tiny muted">No shots fired yet.</div>'; return; }
+      $('historyArea').innerHTML = [...state.moves].reverse().slice(0, 60).map(m => `
+        <div class="move"><span>#${m.move_number} ${playerName(m.player_id)} → ${playerName(m.target_player_id)} at (${m.row}, ${m.col})</span><b class="${m.result}">${m.result.toUpperCase()}</b></div>`).join('');
+    }
+
+    $('themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+    $('homeBtn').onclick = () => showPage('home');
+    $('createPlayerBtn').onclick = () => createPlayer().catch(err => toast(err.message));
+    $('createGameBtn').onclick = () => createGame().catch(err => toast(err.message));
+    $('refreshGamesBtn').onclick = refreshOpenGames;
+    $('joinByIdBtn').onclick = () => { const id = Number($('joinGameIdInput').value); id ? joinGame(id).catch(err => toast(err.message)) : toast('Enter a valid game ID.'); };
+    $('refreshGameBtn').onclick = () => refreshGame(false);
+    $('leaveGameBtn').onclick = () => { if (state.socket && state.gameId) state.socket.emit('leave_game', { game_id: state.gameId }); localStorage.removeItem('fc_game_id'); state.gameId = null; showPage('home'); refreshOpenGames(); };
+    $('horizontalBtn').onclick = () => { state.orientation = 'horizontal'; toast('Horizontal placement'); };
+    $('verticalBtn').onclick = () => { state.orientation = 'vertical'; toast('Vertical placement'); };
+    $('clearShipsBtn').onclick = () => { state.plannedShips = []; renderShipPicker(); renderGame(); };
+    $('submitShipsBtn').onclick = () => submitShips().catch(err => toast(err.message));
+
+    setTheme(localStorage.getItem('fc_theme') || 'dark');
+    if (state.username) $('usernameInput').value = state.username;
+    updateBadges();
+    setupSocket();
+    renderShipPicker();
+    refreshOpenGames();
+    if (state.gameId && state.playerId) enterGame(state.gameId);
+    state.refreshTimer = setInterval(() => { refreshOpenGames(); if (state.gameId) refreshGame(true); }, 12000);
+  </script>
 </body>
 </html>
