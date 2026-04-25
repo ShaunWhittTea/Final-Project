@@ -3,6 +3,7 @@ import os
 import time
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from dotenv import load_dotenv
 from psycopg.errors import UniqueViolation
 
@@ -36,6 +37,7 @@ PLACEHOLDER_PLAYER_IDS = {":player_id", "{player_id}"}
 
 app = Flask(__name__)
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 
 def error_response(error: str, message: str, status: int = 400):
@@ -594,6 +596,99 @@ def build_boards_payload(cur, game_id, viewer_player_id):
     }
 
 
+def emit_open_games_update():
+    socketio.emit("open_games_changed", {"changed": True}, room="lobby")
+
+
+def emit_game_update(game_id, event_name="game_update", extra=None):
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                game = get_game_row(cur, game_id)
+                if not game:
+                    return
+                players = get_turn_order_rows(cur, game_id)
+                public_payload = {
+                    "game_id": game_id,
+                    "status": game["status"],
+                    "grid_size": game["grid_size"],
+                    "max_players": game["max_players"],
+                    "active_players": len(players),
+                    "current_turn_player_id": current_turn_player_id(cur, game_id) if game["status"] == PLAYING_STATUS else None,
+                }
+                if extra:
+                    public_payload.update(extra)
+                socketio.emit("game_public_update", public_payload, room=f"game:{game_id}")
+                for player in players:
+                    payload = build_boards_payload(cur, game_id, player["player_id"])
+                    if payload:
+                        if extra:
+                            payload["last_event"] = extra
+                        socketio.emit(event_name, payload, room=f"game:{game_id}:player:{player['player_id']}")
+    except Exception as ex:
+        print(f"Socket emit game update error: {ex}")
+
+
+@socketio.on("connect")
+def socket_connect():
+    emit("connected", {"status": "connected"})
+
+
+@socketio.on("join_lobby")
+def socket_join_lobby():
+    join_room("lobby")
+    emit("lobby_joined", {"status": "joined"})
+
+
+@socketio.on("leave_lobby")
+def socket_leave_lobby():
+    leave_room("lobby")
+
+
+@socketio.on("join_game_room")
+def socket_join_game_room(data):
+    data = data or {}
+    game_id = resolve_game_id(data.get("game_id") or data.get("gameId"))
+    player_id = resolve_player_id(data.get("player_id") or data.get("playerId"))
+    if not is_valid_int_id(game_id) or not is_valid_int_id(player_id):
+        emit("game_error", {"message": "game_id and player_id are required"})
+        return
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                if not player_in_game(cur, game_id, player_id):
+                    emit("game_error", {"message": "Player is not in this game"})
+                    return
+                payload = build_boards_payload(cur, game_id, player_id)
+        join_room(f"game:{game_id}")
+        join_room(f"game:{game_id}:player:{player_id}")
+        emit("game_joined", {"game_id": game_id, "player_id": player_id})
+        if payload:
+            emit("game_update", payload)
+    except Exception as ex:
+        print(f"Socket join game room error: {ex}")
+        emit("game_error", {"message": "Failed to join live game room"})
+
+
+@socketio.on("request_game_update")
+def socket_request_game_update(data):
+    data = data or {}
+    game_id = resolve_game_id(data.get("game_id") or data.get("gameId"))
+    player_id = resolve_player_id(data.get("player_id") or data.get("playerId"))
+    if not is_valid_int_id(game_id) or not is_valid_int_id(player_id):
+        emit("game_error", {"message": "game_id and player_id are required"})
+        return
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                payload = build_boards_payload(cur, game_id, player_id)
+        if payload:
+            emit("game_update", payload)
+    except Exception as ex:
+        print(f"Socket request update error: {ex}")
+        emit("game_error", {"message": "Failed to load game update"})
+
+
 try:
     init_db()
     if TEST_MODE and AUTO_RESET_ON_START:
@@ -704,6 +799,8 @@ def list_games():
 def system_reset():
     try:
         reset_database()
+        emit_open_games_update()
+        socketio.emit("system_reset", {"status": "reset"})
         return jsonify({"status": "reset"}), 200
     except Exception as ex:
         print(f"System reset error: {ex}")
@@ -904,6 +1001,8 @@ def create_game():
                 )
                 conn.commit()
 
+        emit_open_games_update()
+        emit_game_update(game["game_id"], extra={"type": "game_created"})
         return jsonify({
             "game_id": game["game_id"],
             "grid_size": grid_size,
@@ -1006,6 +1105,8 @@ def join_game(game_id):
                 update_game_to_playing_if_ready(cur, game_id)
                 conn.commit()
 
+        emit_open_games_update()
+        emit_game_update(game_id, extra={"type": "player_joined", "player_id": player_id})
         return jsonify({
             "status": "joined",
             "game_id": game_id,
@@ -1073,6 +1174,8 @@ def place_production_ships(game_id):
                 update_game_to_playing_if_ready(cur, game_id)
                 conn.commit()
 
+        emit_open_games_update()
+        emit_game_update(game_id, extra={"type": "ships_placed", "player_id": player_id})
         return jsonify({
             "status": "placed",
             "message": "ok",
@@ -1267,6 +1370,16 @@ def fire(game_id):
         }
         if winner_id is not None:
             response["winner_id"] = winner_id
+        emit_game_update(game_id, extra={
+            "type": "shot_fired",
+            "attacker_player_id": player_id,
+            "target_player_id": target_player_id,
+            "row": row,
+            "col": col,
+            "result": result,
+            "next_player_id": next_player_id,
+            "winner_id": winner_id,
+        })
         return jsonify(response), 200
 
     except UniqueViolation:
@@ -1633,4 +1746,4 @@ def test_set_turn(game_id):
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    socketio.run(app, host="0.0.0.0", port=port)
