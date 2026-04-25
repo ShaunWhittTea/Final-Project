@@ -154,25 +154,24 @@
       font-size: 12px; font-weight: 850; color: var(--muted);
     }
 
-    .game-list { display: grid; gap: 10px; max-height: 360px; overflow:auto; padding-right: 4px; scrollbar-width: none; }
-    .game-list::-webkit-scrollbar { display:none; }
+    .game-list { display: grid; gap: 10px; padding-right: 0; }
     .game-card { display:flex; justify-content:space-between; align-items:center; gap:10px; padding: 14px; border-radius: 18px; background: rgba(255,255,255,.055); border:1px solid var(--line); }
     .game-card strong { display:block; margin-bottom: 4px; }
 
-    .game-shell { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; height: calc(100vh - 96px); min-height: 0; overflow: hidden; }
+    .game-shell { display: grid; grid-template-rows: auto auto auto; gap: 10px; min-height: 0; overflow: visible; }
     .game-header { display:grid; grid-template-columns: 1fr auto; gap: 10px; align-items:center; padding: 12px 14px; }
     .status-strip { display:flex; flex-wrap:wrap; gap: 7px; margin-top: 8px; }
-    .game-main { display:grid; grid-template-columns: 260px minmax(0, 1fr); gap: 10px; min-height: 0; overflow: hidden; }
-    .side-rail { min-height:0; overflow: hidden; }
-    .arena { min-height:0; overflow: hidden; padding: 10px; }
-    .boards { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; align-items:start; height: 100%; overflow: hidden; }
-    .board-card { border: 1px solid var(--line); border-radius: 18px; padding: 9px; background: rgba(255,255,255,.055); box-shadow: var(--shadow2); min-width: 0; overflow: hidden; }
+    .game-main { display:grid; grid-template-columns: 230px minmax(0, 1fr); gap: 10px; min-height: 0; overflow: visible; align-items: start; }
+    .side-rail { min-height:0; overflow: visible; }
+    .arena { min-height:0; overflow: visible; padding: 10px; }
+    .boards { display:grid; grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); gap: 10px; align-items:start; overflow: visible; }
+    .board-card { border: 1px solid var(--line); border-radius: 18px; padding: 8px; background: rgba(255,255,255,.055); box-shadow: var(--shadow2); min-width: 0; overflow: visible; }
     .board-card.viewer { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); }
     .board-card.current { box-shadow: 0 0 0 2px rgba(34,197,94,.22), var(--shadow2); }
     .board-head { display:flex; align-items:flex-start; justify-content:space-between; gap:7px; margin-bottom: 8px; }
     .board-title strong { display:block; font-size: 15px; }
     .board-title span { display:block; margin-top:4px; color: var(--muted); font-size:12px; font-weight:700; }
-    .grid { display:grid; gap: 2px; grid-template-columns: repeat(var(--grid-size), minmax(0, 1fr)); width: 100%; max-width: min(100%, 320px); margin: 0 auto; }
+    .grid { display:grid; gap: 2px; grid-template-columns: repeat(var(--grid-size), var(--cell-px)); width: max-content; max-width: 100%; margin: 0 auto; justify-content: center; }
     .cell {
       aspect-ratio: 1;
       border-radius: 6px;
@@ -202,14 +201,12 @@
     .ship-dots { display:flex; gap:3px; }
     .ship-dots i { width:13px; height:13px; border-radius:5px; background: linear-gradient(135deg, var(--ship), var(--ship2)); display:block; }
 
-    .bottom-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; min-height: 135px; max-height: 170px; overflow: hidden; }
-    .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(145px,1fr)); gap: 7px; overflow: auto; max-height: 104px; padding-right: 0; scrollbar-width: none; }
-    .stats-grid::-webkit-scrollbar { display: none; }
+    .bottom-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; min-height: 0; overflow: visible; }
+    .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(145px,1fr)); gap: 7px; overflow: visible; padding-right: 0; }
     .stat-card { padding: 8px; border-radius: 13px; border:1px solid var(--line); background: rgba(255,255,255,.055); }
     .stat-card strong { display:block; margin-bottom: 8px; }
     .stat-line { display:grid; grid-template-columns: 1fr auto; gap:8px; color: var(--muted); font-size: 13px; margin-top: 5px; }
-    .history { display:grid; gap: 6px; overflow: auto; max-height: 104px; padding-right: 0; scrollbar-width: none; }
-    .history::-webkit-scrollbar { display: none; }
+    .history { display:grid; gap: 6px; overflow: visible; padding-right: 0; }
     .move { display:flex; justify-content:space-between; gap:8px; align-items:center; padding: 7px 9px; border-radius: 14px; border:1px solid var(--line); background: rgba(255,255,255,.055); font-size: 13px; }
     .move b.hit { color: #fecaca; }
     html[data-theme="light"] .move b.hit { color: #dc2626; }
@@ -219,8 +216,8 @@
     .toast div { max-width: 420px; padding: 13px 15px; border-radius: 16px; background: var(--surface2); border:1px solid var(--line2); box-shadow: var(--shadow2); font-weight: 800; }
 
 
-    body.game-active { overflow: hidden; }
-    .game-page-no-scroll { overflow: hidden; }
+    body.game-active { overflow: auto; }
+    .game-page-no-scroll { overflow: visible; }
     html[data-theme="light"] .cell.ship,
     html[data-theme="light"] .cell.preview { background: linear-gradient(135deg, #1d4ed8, #0891b2); color: white; }
     html[data-theme="light"] .cell.sunk,
@@ -235,6 +232,12 @@
     .stat-line { font-size: 11px; margin-top: 2px; }
     .stat-card strong { margin-bottom: 4px; font-size: 13px; }
     .section-title { margin-bottom: 8px; }
+
+    @media (max-width: 1250px) {
+      .game-main { grid-template-columns: 210px minmax(0, 1fr); }
+      .boards { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+      .cell { border-radius: 5px; font-size: 9px; }
+    }
 
     @media (max-width: 980px) {
       .home-grid, .game-main, .bottom-grid { grid-template-columns: 1fr; }
@@ -531,6 +534,13 @@
       });
     }
 
+    function cellPx(size) {
+      if (size <= 8) return 26;
+      if (size <= 10) return 23;
+      if (size <= 12) return 20;
+      return 16;
+    }
+
     function boardHtml(board, size) {
       const data = state.boards;
       const canPlace = data.status === 'waiting_setup' && board.is_viewer && !board.placed;
@@ -548,7 +558,7 @@
       }
       return `<article class="board-card ${board.is_viewer ? 'viewer' : ''} ${board.is_current_turn ? 'current' : ''}">
         <div class="board-head"><div class="board-title"><strong>${board.username}${board.is_viewer ? ' (You)' : ''}</strong><span>${board.placed ? 'Fleet ready' : 'Placing fleet'} · ${board.ships_remaining} cells afloat</span></div><span class="pill">${board.eliminated ? 'Eliminated' : board.is_current_turn ? 'Turn' : `#${board.turn_order + 1}`}</span></div>
-        <div class="grid" style="--grid-size:${size}">${cells}</div>
+        <div class="grid" style="--grid-size:${size}; --cell-px:${cellPx(size)}px">${cells}</div>
       </article>`;
     }
 
