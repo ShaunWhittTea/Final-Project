@@ -1387,19 +1387,17 @@
       return data;
     }
 
-    async function refreshSelectedGame(showErrors = false) {
+    async function refreshSelectedGame(showErrors = false, options = {}) {
       if (!state.selectedGameId || !state.player) {
         renderMain();
         return;
       }
+
+      const includeSlowData = options.includeSlowData === true;
       try {
-        await Promise.all([
-          loadGame(state.selectedGameId),
-          loadBoards(state.selectedGameId),
-          loadMoves(state.selectedGameId),
-          loadPlayerStats(),
-          loadLeaderboard(),
-        ]);
+        const work = [loadGame(state.selectedGameId), loadBoards(state.selectedGameId), loadMoves(state.selectedGameId)];
+        if (includeSlowData) work.push(loadPlayerStats(), loadLeaderboard());
+        await Promise.all(work);
         renderSidebar();
         renderMain();
       } catch (err) {
@@ -1433,9 +1431,45 @@
     }
     window.submitPlacement = submitPlacement;
 
+    function applyShotInstantly(result, targetPlayerId, row, col) {
+      const gameId = Number(state.selectedGameId);
+      const payload = state.boardsByGame.get(gameId);
+      if (!payload || !Array.isArray(payload.boards)) return;
+
+      const targetBoard = payload.boards.find((board) => Number(board.player_id) === Number(targetPlayerId));
+      if (targetBoard?.grid?.[row]) {
+        const oldCell = targetBoard.grid[row][col];
+        targetBoard.grid[row][col] = result.result === 'hit' ? 'sunk' : 'miss';
+        if (result.result === 'hit' && oldCell !== 'sunk') {
+          targetBoard.ships_remaining = Math.max(0, Number(targetBoard.ships_remaining || 0) - 1);
+          targetBoard.eliminated = targetBoard.ships_remaining === 0;
+        }
+      }
+
+      payload.your_turn = false;
+      payload.current_turn_player_id = result.next_player_id || null;
+      payload.status = result.game_status || payload.status;
+      payload.winner_id = result.winner_id || payload.winner_id || null;
+      for (const board of payload.boards) board.is_current_turn = Number(board.player_id) === Number(payload.current_turn_player_id);
+
+      const moves = state.movesByGame.get(gameId) || [];
+      state.movesByGame.set(gameId, [{
+        move_number: moves.length + 1,
+        player_id: state.player.player_id,
+        target_player_id: Number(targetPlayerId),
+        row: Number(row),
+        col: Number(col),
+        result: result.result,
+        timestamp: new Date().toISOString(),
+      }, ...moves]);
+    }
+
     window.fireAt = async function fireAt(targetPlayerId, row, col) {
       if (!state.selectedGameId || !state.player) return;
+      const shotKey = `${state.selectedGameId}:${targetPlayerId}:${row}:${col}`;
       try {
+        state.lastShotKey = shotKey;
+        setAlert(el.mainAlert, 'Firing…', 'info');
         const result = await api(`/api/games/${state.selectedGameId}/fire`, {
           method: 'POST',
           body: JSON.stringify({
@@ -1445,26 +1479,41 @@
             col: Number(col),
           }),
         });
-        state.lastShotKey = `${state.selectedGameId}:${targetPlayerId}:${row}:${col}`;
+
+        applyShotInstantly(result, targetPlayerId, row, col);
+        renderSidebar();
+        renderMain();
+
         const summary = result.winner_id
           ? `Direct hit. Game over — winner is ${resolvePlayerName(result.winner_id)}.`
           : `Shot result: ${result.result.toUpperCase()}.`;
         setAlert(el.mainAlert, summary, result.result === 'hit' ? 'success' : 'info');
-        await refreshSelectedGame();
+
+        await Promise.all([loadGame(state.selectedGameId), loadBoards(state.selectedGameId), loadMoves(state.selectedGameId)]);
+        renderSidebar();
+        renderMain();
       } catch (err) {
         setAlert(el.mainAlert, err.message, 'error');
+        await refreshSelectedGame(false);
       }
     };
 
     function startPolling() {
       if (state.pollingHandle) clearInterval(state.pollingHandle);
+      let slowTick = 0;
       state.pollingHandle = setInterval(async () => {
-        await loadOpenGames();
-        if (state.player) {
-          await loadPlayerStats();
-          if (state.selectedGameId) await refreshSelectedGame();
+        if (state.player && state.selectedGameId) {
+          await refreshSelectedGame(false, { includeSlowData: false });
         }
-      }, 2500);
+        slowTick += 1;
+        if (slowTick % 8 === 0) {
+          const work = [loadOpenGames(), loadLeaderboard()];
+          if (state.player) work.push(loadPlayerStats());
+          await Promise.allSettled(work);
+          renderSidebar();
+          renderMain();
+        }
+      }, 700);
     }
 
     async function initialize() {
@@ -1483,7 +1532,7 @@
       if (state.player) {
         await Promise.all([loadPlayerStats(), loadLeaderboard()]);
         if (state.selectedGameId) {
-          await refreshSelectedGame();
+          await refreshSelectedGame(false, { includeSlowData: true });
         }
       } else {
         await loadLeaderboard();
