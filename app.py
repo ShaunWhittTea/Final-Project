@@ -3,7 +3,7 @@ import os
 import time
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask_socketio import SocketIO, join_room, leave_room
 from dotenv import load_dotenv
 from psycopg.errors import UniqueViolation
 
@@ -27,6 +27,13 @@ MAX_PLAYERS = 10
 DEFAULT_GRID_SIZE = 8
 DEFAULT_MAX_PLAYERS = 2
 SHIPS_PER_PLAYER = 3
+SHIP_BLUEPRINTS = [
+    {"type": "patrol", "name": "Patrol Boat", "size": 2},
+    {"type": "destroyer", "name": "Destroyer", "size": 3},
+    {"type": "carrier", "name": "Carrier", "size": 5},
+]
+SHIP_SIZES = sorted([ship["size"] for ship in SHIP_BLUEPRINTS])
+TOTAL_SHIP_CELLS = sum(SHIP_SIZES)
 
 WAITING_STATUS = "waiting_setup"
 PLAYING_STATUS = "playing"
@@ -39,6 +46,36 @@ app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
+
+
+def socket_room(game_id):
+    return f"game_{game_id}"
+
+
+def notify_game_update(game_id, reason="game_update"):
+    try:
+        socketio.emit("game_changed", {"game_id": game_id, "reason": reason, "timestamp": time.time()}, room=socket_room(game_id))
+        socketio.emit("open_games_changed", {"reason": reason, "timestamp": time.time()})
+    except Exception as ex:
+        print(f"Socket emit failed: {ex}")
+
+
+@socketio.on("watch_game")
+def socket_watch_game(data):
+    game_id = resolve_game_id((data or {}).get("game_id"))
+    if is_valid_int_id(game_id):
+        join_room(socket_room(game_id))
+        return {"ok": True, "room": socket_room(game_id)}
+    return {"ok": False, "error": "invalid_game_id"}
+
+
+@socketio.on("leave_game")
+def socket_leave_game(data):
+    game_id = resolve_game_id((data or {}).get("game_id"))
+    if is_valid_int_id(game_id):
+        leave_room(socket_room(game_id))
+        return {"ok": True}
+    return {"ok": False, "error": "invalid_game_id"}
 
 def error_response(error: str, message: str, status: int = 400):
     return jsonify({"error": error, "message": message}), status
@@ -317,31 +354,82 @@ def update_game_to_playing_if_ready(cur, game_id):
 
 
 def normalize_ship_cells(raw_ships, grid_size):
-    if not isinstance(raw_ships, list) or len(raw_ships) != SHIPS_PER_PLAYER:
+    """Validate production ship placement.
+
+    New format: one 2-cell ship, one 3-cell ship, and one 5-cell ship:
+      [{"type": "patrol", "coordinates": [[0,0], [0,1]]}, ...]
+
+    The older checkpoint format of three {row, col} single ships is still
+    accepted for backwards compatibility with simple API tests.
+    """
+    if not isinstance(raw_ships, list):
+        return None
+
+    if len(raw_ships) == SHIPS_PER_PLAYER and all(isinstance(ship, dict) and "row" in ship and "col" in ship for ship in raw_ships):
+        normalized = []
+        seen = set()
+        for index, ship in enumerate(raw_ships, start=1):
+            row = ship.get("row")
+            col = ship.get("col")
+            if not isinstance(row, int) or not isinstance(col, int):
+                return None
+            if row < 0 or row >= grid_size or col < 0 or col >= grid_size:
+                return None
+            if (row, col) in seen:
+                return None
+            seen.add((row, col))
+            normalized.append({"type": f"single_{index}", "coordinates": [(row, col)]})
+        return normalized
+
+    if len(raw_ships) != len(SHIP_BLUEPRINTS):
         return None
 
     normalized = []
-    seen = set()
+    occupied = set()
+    actual_sizes = []
 
     for ship in raw_ships:
         if not isinstance(ship, dict):
             return None
 
-        if set(ship.keys()) - {"row", "col"}:
+        ship_type = ship.get("type", "ship")
+        coordinates = ship.get("coordinates")
+        if not isinstance(ship_type, str) or not isinstance(coordinates, list):
             return None
 
-        row = ship.get("row")
-        col = ship.get("col")
+        cleaned = []
+        local_seen = set()
+        for cell in coordinates:
+            if not isinstance(cell, (list, tuple)) or len(cell) != 2:
+                return None
+            row, col = cell
+            if not isinstance(row, int) or not isinstance(col, int):
+                return None
+            if row < 0 or row >= grid_size or col < 0 or col >= grid_size:
+                return None
+            if (row, col) in local_seen or (row, col) in occupied:
+                return None
+            cleaned.append((row, col))
+            local_seen.add((row, col))
 
-        if not isinstance(row, int) or not isinstance(col, int):
-            return None
-        if row < 0 or row >= grid_size or col < 0 or col >= grid_size:
-            return None
-        if (row, col) in seen:
+        size = len(cleaned)
+        actual_sizes.append(size)
+        rows = {row for row, _ in cleaned}
+        cols = {col for _, col in cleaned}
+        if len(rows) != 1 and len(cols) != 1:
             return None
 
-        seen.add((row, col))
-        normalized.append((row, col))
+        ordered = sorted(col for _, col in cleaned) if len(rows) == 1 else sorted(row for row, _ in cleaned)
+        if ordered != list(range(ordered[0], ordered[0] + size)):
+            return None
+
+        for coord in cleaned:
+            occupied.add(coord)
+
+        normalized.append({"type": ship_type[:50], "coordinates": cleaned})
+
+    if sorted(actual_sizes) != SHIP_SIZES:
+        return None
 
     return normalized
 
@@ -596,99 +684,6 @@ def build_boards_payload(cur, game_id, viewer_player_id):
     }
 
 
-def emit_open_games_update():
-    socketio.emit("open_games_changed", {"changed": True}, room="lobby")
-
-
-def emit_game_update(game_id, event_name="game_update", extra=None):
-    try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                game = get_game_row(cur, game_id)
-                if not game:
-                    return
-                players = get_turn_order_rows(cur, game_id)
-                public_payload = {
-                    "game_id": game_id,
-                    "status": game["status"],
-                    "grid_size": game["grid_size"],
-                    "max_players": game["max_players"],
-                    "active_players": len(players),
-                    "current_turn_player_id": current_turn_player_id(cur, game_id) if game["status"] == PLAYING_STATUS else None,
-                }
-                if extra:
-                    public_payload.update(extra)
-                socketio.emit("game_public_update", public_payload, room=f"game:{game_id}")
-                for player in players:
-                    payload = build_boards_payload(cur, game_id, player["player_id"])
-                    if payload:
-                        if extra:
-                            payload["last_event"] = extra
-                        socketio.emit(event_name, payload, room=f"game:{game_id}:player:{player['player_id']}")
-    except Exception as ex:
-        print(f"Socket emit game update error: {ex}")
-
-
-@socketio.on("connect")
-def socket_connect():
-    emit("connected", {"status": "connected"})
-
-
-@socketio.on("join_lobby")
-def socket_join_lobby():
-    join_room("lobby")
-    emit("lobby_joined", {"status": "joined"})
-
-
-@socketio.on("leave_lobby")
-def socket_leave_lobby():
-    leave_room("lobby")
-
-
-@socketio.on("join_game_room")
-def socket_join_game_room(data):
-    data = data or {}
-    game_id = resolve_game_id(data.get("game_id") or data.get("gameId"))
-    player_id = resolve_player_id(data.get("player_id") or data.get("playerId"))
-    if not is_valid_int_id(game_id) or not is_valid_int_id(player_id):
-        emit("game_error", {"message": "game_id and player_id are required"})
-        return
-    try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                if not player_in_game(cur, game_id, player_id):
-                    emit("game_error", {"message": "Player is not in this game"})
-                    return
-                payload = build_boards_payload(cur, game_id, player_id)
-        join_room(f"game:{game_id}")
-        join_room(f"game:{game_id}:player:{player_id}")
-        emit("game_joined", {"game_id": game_id, "player_id": player_id})
-        if payload:
-            emit("game_update", payload)
-    except Exception as ex:
-        print(f"Socket join game room error: {ex}")
-        emit("game_error", {"message": "Failed to join live game room"})
-
-
-@socketio.on("request_game_update")
-def socket_request_game_update(data):
-    data = data or {}
-    game_id = resolve_game_id(data.get("game_id") or data.get("gameId"))
-    player_id = resolve_player_id(data.get("player_id") or data.get("playerId"))
-    if not is_valid_int_id(game_id) or not is_valid_int_id(player_id):
-        emit("game_error", {"message": "game_id and player_id are required"})
-        return
-    try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                payload = build_boards_payload(cur, game_id, player_id)
-        if payload:
-            emit("game_update", payload)
-    except Exception as ex:
-        print(f"Socket request update error: {ex}")
-        emit("game_error", {"message": "Failed to load game update"})
-
-
 try:
     init_db()
     if TEST_MODE and AUTO_RESET_ON_START:
@@ -799,8 +794,6 @@ def list_games():
 def system_reset():
     try:
         reset_database()
-        emit_open_games_update()
-        socketio.emit("system_reset", {"status": "reset"})
         return jsonify({"status": "reset"}), 200
     except Exception as ex:
         print(f"System reset error: {ex}")
@@ -1001,8 +994,7 @@ def create_game():
                 )
                 conn.commit()
 
-        emit_open_games_update()
-        emit_game_update(game["game_id"], extra={"type": "game_created"})
+        notify_game_update(game["game_id"], "game_created")
         return jsonify({
             "game_id": game["game_id"],
             "grid_size": grid_size,
@@ -1105,8 +1097,7 @@ def join_game(game_id):
                 update_game_to_playing_if_ready(cur, game_id)
                 conn.commit()
 
-        emit_open_games_update()
-        emit_game_update(game_id, extra={"type": "player_joined", "player_id": player_id})
+        notify_game_update(game_id, "player_joined")
         return jsonify({
             "status": "joined",
             "game_id": game_id,
@@ -1160,22 +1151,25 @@ def place_production_ships(game_id):
 
                 normalized = normalize_ship_cells(ships, game["grid_size"])
                 if normalized is None:
-                    return error_response("bad_request", "Exactly 3 valid ships are required", 400)
+                    return error_response("bad_request", "Place one 2-cell ship, one 3-cell ship, and one 5-cell ship", 400)
 
-                for row, col in normalized:
-                    cur.execute(
-                        """
-                        INSERT INTO ships (game_id, player_id, ship_type, coordinates, row_index, col_index)
-                        VALUES (%s, %s, 'single', %s::jsonb, %s, %s)
-                        """,
-                        (game_id, player_id, json.dumps([[row, col]]), row, col)
-                    )
+                for ship in normalized:
+                    ship_type = ship["type"]
+                    coords = ship["coordinates"]
+                    coords_json = json.dumps([[r, c] for r, c in coords])
+                    for row, col in coords:
+                        cur.execute(
+                            """
+                            INSERT INTO ships (game_id, player_id, ship_type, coordinates, row_index, col_index)
+                            VALUES (%s, %s, %s, %s::jsonb, %s, %s)
+                            """,
+                            (game_id, player_id, ship_type, coords_json, row, col)
+                        )
 
                 update_game_to_playing_if_ready(cur, game_id)
                 conn.commit()
 
-        emit_open_games_update()
-        emit_game_update(game_id, extra={"type": "ships_placed", "player_id": player_id})
+        notify_game_update(game_id, "ships_placed")
         return jsonify({
             "status": "placed",
             "message": "ok",
@@ -1362,6 +1356,7 @@ def fire(game_id):
 
                 conn.commit()
 
+        notify_game_update(game_id, "shot_fired")
         response = {
             "result": result,
             "next_player_id": next_player_id,
@@ -1370,16 +1365,6 @@ def fire(game_id):
         }
         if winner_id is not None:
             response["winner_id"] = winner_id
-        emit_game_update(game_id, extra={
-            "type": "shot_fired",
-            "attacker_player_id": player_id,
-            "target_player_id": target_player_id,
-            "row": row,
-            "col": col,
-            "result": result,
-            "next_player_id": next_player_id,
-            "winner_id": winner_id,
-        })
         return jsonify(response), 200
 
     except UniqueViolation:
@@ -1549,6 +1534,7 @@ def test_restart(game_id):
 
                 conn.commit()
 
+        notify_game_update(game_id, "game_reset")
         return jsonify({"status": "reset", "game_id": game_id}), 200
     except Exception as ex:
         print(f"Test restart error: {ex}")
@@ -1620,6 +1606,7 @@ def test_place_ships(game_id):
                 update_game_to_playing_if_ready(cur, game_id)
                 conn.commit()
 
+        notify_game_update(game_id, "ships_placed")
         return jsonify({
             "success": True,
             "status": "placed",
@@ -1738,6 +1725,7 @@ def test_set_turn(game_id):
                 )
                 conn.commit()
 
+        notify_game_update(game_id, "turn_set")
         return jsonify({"status": "turn_set"}), 200
     except Exception as ex:
         print(f"Test set-turn error: {ex}")
