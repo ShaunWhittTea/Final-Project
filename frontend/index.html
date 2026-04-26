@@ -342,7 +342,7 @@
         <section class="stack">
           <div class="panel auth-card server-card"><div class="panel-inner stack">
             <div class="section-title"><h3>Server</h3><span class="pill">Connect to a class server</span></div>
-            <input id="serverUrlInput" placeholder="Leave blank for this server, or enter https://example.onrender.com" />
+            <input id="serverUrlInput" placeholder="https://final-project-m5u7.onrender.com" />
             <button id="saveServerBtn">Use Server</button>
             <div class="tiny muted server-current" id="serverCurrentText">Using this app server.</div>
           </div></div>
@@ -450,6 +450,8 @@
   <div class="toast" id="toast"></div>
 
   <script>
+    const DEFAULT_SERVER_URL = 'https://final-project-m5u7.onrender.com';
+
     const SHIPS = [
       { type: 'patrol', name: 'Patrol Boat', size: 2 },
       { type: 'destroyer', name: 'Destroyer', size: 3 },
@@ -468,7 +470,7 @@
       socket: null,
       refreshTimer: null,
       lastResultModalKey: null,
-      serverUrl: localStorage.getItem('fc_server_url') || ''
+      serverUrl: localStorage.getItem('fc_server_url') || DEFAULT_SERVER_URL
     };
 
     const $ = id => document.getElementById(id);
@@ -489,29 +491,26 @@
     }
 
     function apiUrl(path) {
-      return `${state.serverUrl || ''}${path}`;
+      return `${state.serverUrl || DEFAULT_SERVER_URL}${path}`;
     }
 
     function updateServerUi() {
       if ($('serverUrlInput')) $('serverUrlInput').value = state.serverUrl;
       if ($('serverCurrentText')) {
-        $('serverCurrentText').textContent = state.serverUrl
-          ? `Using external server: ${state.serverUrl}`
-          : 'Using this app server.';
+        $('serverCurrentText').textContent = `Using server: ${state.serverUrl || DEFAULT_SERVER_URL}`;
       }
     }
 
     function saveServer() {
-      state.serverUrl = normalizeServerUrl($('serverUrlInput').value);
-      if (state.serverUrl) localStorage.setItem('fc_server_url', state.serverUrl);
-      else localStorage.removeItem('fc_server_url');
+      state.serverUrl = normalizeServerUrl($('serverUrlInput').value) || DEFAULT_SERVER_URL;
+      localStorage.setItem('fc_server_url', state.serverUrl);
       if (state.socket) {
         state.socket.disconnect();
         state.socket = null;
       }
       setupSocket();
       updateServerUi();
-      toast(state.serverUrl ? `Using ${state.serverUrl}` : 'Using this app server.');
+      toast(`Using ${state.serverUrl}`);
     }
 
     async function api(path, options = {}) {
@@ -580,7 +579,7 @@
         return;
       }
       if (state.socket) state.socket.disconnect();
-      state.socket = io(state.serverUrl || undefined, { transports: ['websocket', 'polling'] });
+      state.socket = io(state.serverUrl || DEFAULT_SERVER_URL, { transports: ['websocket', 'polling'] });
       state.socket.on('connect', () => {
         $('socketStatus').textContent = '● Live';
         if (state.gameId) state.socket.emit('watch_game', { game_id: state.gameId });
