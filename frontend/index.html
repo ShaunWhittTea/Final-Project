@@ -154,24 +154,25 @@
       font-size: 12px; font-weight: 850; color: var(--muted);
     }
 
-    .game-list { display: grid; gap: 10px; padding-right: 0; }
+    .game-list { display: grid; gap: 10px; max-height: 360px; overflow:auto; padding-right: 4px; scrollbar-width: none; }
+    .game-list::-webkit-scrollbar { display:none; }
     .game-card { display:flex; justify-content:space-between; align-items:center; gap:10px; padding: 14px; border-radius: 18px; background: rgba(255,255,255,.055); border:1px solid var(--line); }
     .game-card strong { display:block; margin-bottom: 4px; }
 
-    .game-shell { display: grid; grid-template-rows: auto auto auto; gap: 10px; min-height: 0; overflow: visible; }
+    .game-shell { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; height: calc(100vh - 96px); min-height: 0; overflow: hidden; }
     .game-header { display:grid; grid-template-columns: 1fr auto; gap: 10px; align-items:center; padding: 12px 14px; }
     .status-strip { display:flex; flex-wrap:wrap; gap: 7px; margin-top: 8px; }
-    .game-main { display:grid; grid-template-columns: 230px minmax(0, 1fr); gap: 10px; min-height: 0; overflow: visible; align-items: start; }
-    .side-rail { min-height:0; overflow: visible; }
-    .arena { min-height:0; overflow: visible; padding: 10px; }
-    .boards { display:grid; grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); gap: 10px; align-items:start; overflow: visible; }
-    .board-card { border: 1px solid var(--line); border-radius: 18px; padding: 8px; background: rgba(255,255,255,.055); box-shadow: var(--shadow2); min-width: 0; overflow: visible; }
+    .game-main { display:grid; grid-template-columns: 260px minmax(0, 1fr); gap: 10px; min-height: 0; overflow: hidden; }
+    .side-rail { min-height:0; overflow: hidden; }
+    .arena { min-height:0; overflow: hidden; padding: 10px; }
+    .boards { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; align-items:start; height: 100%; overflow: hidden; }
+    .board-card { border: 1px solid var(--line); border-radius: 18px; padding: 9px; background: rgba(255,255,255,.055); box-shadow: var(--shadow2); min-width: 0; overflow: hidden; }
     .board-card.viewer { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); }
     .board-card.current { box-shadow: 0 0 0 2px rgba(34,197,94,.22), var(--shadow2); }
     .board-head { display:flex; align-items:flex-start; justify-content:space-between; gap:7px; margin-bottom: 8px; }
     .board-title strong { display:block; font-size: 15px; }
     .board-title span { display:block; margin-top:4px; color: var(--muted); font-size:12px; font-weight:700; }
-    .grid { display:grid; gap: 2px; grid-template-columns: repeat(var(--grid-size), var(--cell-px)); width: max-content; max-width: 100%; margin: 0 auto; justify-content: center; }
+    .grid { display:grid; gap: 2px; grid-template-columns: repeat(var(--grid-size), minmax(0, 1fr)); width: 100%; max-width: min(100%, 320px); margin: 0 auto; }
     .cell {
       aspect-ratio: 1;
       border-radius: 6px;
@@ -201,12 +202,14 @@
     .ship-dots { display:flex; gap:3px; }
     .ship-dots i { width:13px; height:13px; border-radius:5px; background: linear-gradient(135deg, var(--ship), var(--ship2)); display:block; }
 
-    .bottom-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; min-height: 0; overflow: visible; }
-    .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(145px,1fr)); gap: 7px; overflow: visible; padding-right: 0; }
+    .bottom-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; min-height: 135px; max-height: 170px; overflow: hidden; }
+    .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(145px,1fr)); gap: 7px; overflow: auto; max-height: 104px; padding-right: 0; scrollbar-width: none; }
+    .stats-grid::-webkit-scrollbar { display: none; }
     .stat-card { padding: 8px; border-radius: 13px; border:1px solid var(--line); background: rgba(255,255,255,.055); }
     .stat-card strong { display:block; margin-bottom: 8px; }
     .stat-line { display:grid; grid-template-columns: 1fr auto; gap:8px; color: var(--muted); font-size: 13px; margin-top: 5px; }
-    .history { display:grid; gap: 6px; overflow: visible; padding-right: 0; }
+    .history { display:grid; gap: 6px; overflow: auto; max-height: 104px; padding-right: 0; scrollbar-width: none; }
+    .history::-webkit-scrollbar { display: none; }
     .move { display:flex; justify-content:space-between; gap:8px; align-items:center; padding: 7px 9px; border-radius: 14px; border:1px solid var(--line); background: rgba(255,255,255,.055); font-size: 13px; }
     .move b.hit { color: #fecaca; }
     html[data-theme="light"] .move b.hit { color: #dc2626; }
@@ -216,8 +219,8 @@
     .toast div { max-width: 420px; padding: 13px 15px; border-radius: 16px; background: var(--surface2); border:1px solid var(--line2); box-shadow: var(--shadow2); font-weight: 800; }
 
 
-    body.game-active { overflow: auto; }
-    .game-page-no-scroll { overflow: visible; }
+    body.game-active { overflow: hidden; }
+    .game-page-no-scroll { overflow: hidden; }
     html[data-theme="light"] .cell.ship,
     html[data-theme="light"] .cell.preview { background: linear-gradient(135deg, #1d4ed8, #0891b2); color: white; }
     html[data-theme="light"] .cell.sunk,
@@ -233,12 +236,6 @@
     .stat-card strong { margin-bottom: 4px; font-size: 13px; }
     .section-title { margin-bottom: 8px; }
 
-    @media (max-width: 1250px) {
-      .game-main { grid-template-columns: 210px minmax(0, 1fr); }
-      .boards { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-      .cell { border-radius: 5px; font-size: 9px; }
-    }
-
     @media (max-width: 980px) {
       .home-grid, .game-main, .bottom-grid { grid-template-columns: 1fr; }
       .game-shell { height: auto; min-height: 0; }
@@ -248,6 +245,25 @@
       .topbar { align-items:flex-start; flex-direction:column; }
       .controls { justify-content:flex-start; }
     }
+  
+
+    .auth-card h3, .lobby-card h3 { font-size: 23px; }
+    .auth-actions { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .auth-note { padding: 13px 15px; border-radius: 18px; border: 1px solid var(--line); background: rgba(255,255,255,.055); color: var(--muted); font-weight: 650; line-height: 1.45; }
+    .lobby-grid { display:grid; grid-template-columns: .9fr 1.1fr; gap:16px; align-items:start; }
+    .welcome-panel { padding: 28px; }
+    .welcome-panel h2 { font-size: clamp(34px, 4vw, 58px); line-height: .95; margin-bottom: 12px; }
+    .welcome-panel p { color: var(--muted); font-size: 16px; line-height: 1.55; font-weight: 650; }
+    body.game-active { overflow: auto !important; }
+    .game-page-no-scroll, .game-shell, .game-main, .side-rail, .arena, .boards, .bottom-grid, .stats-grid, .history, .game-list { overflow: visible !important; }
+    .game-shell { height: auto !important; min-height: 0 !important; }
+    .side-rail { align-self: start; }
+    .boards { height: auto !important; }
+    .bottom-grid { max-height: none !important; min-height: 0 !important; }
+    .stats-grid, .history, .game-list { max-height: none !important; }
+    #signOutBtn[hidden] { display:none; }
+    @media (max-width: 980px) { .lobby-grid, .auth-actions { grid-template-columns: 1fr; } }
+
   </style>
 </head>
 <body>
@@ -264,35 +280,59 @@
         <span class="pill" id="socketStatus">● Connecting</span>
         <span class="pill" id="playerBadge">No player</span>
         <button class="btn-small" id="themeBtn">Light mode</button>
-        <button class="btn-small" id="homeBtn">Home</button>
+        <button class="btn-small btn-danger" id="signOutBtn" hidden>Sign out</button>
       </div>
     </header>
 
-    <main id="homePage" class="page active">
+    <main id="authPage" class="page active">
       <div class="home-grid">
         <section class="panel hero">
           <div>
             <span class="pill">Live WebSocket fleet combat</span>
             <h2>Command your fleet. Sink every rival.</h2>
-            <p>Create a player, launch or join an open game, then move into a focused battle room with large boards, live turns, ship placement, stats, and move history.</p>
+            <p>Sign in to your existing commander profile or create a new one. After signing in, you will move to the mission lobby where you can create a game, join by ID, or enter an open battle.</p>
             <div class="feature-row">
-              <div class="feature"><b>Real-time updates</b><span>Shots, joins, turns, and placements refresh automatically for every player.</span></div>
-              <div class="feature"><b>True fleet sizes</b><span>Place a 2-long patrol boat, 3-long destroyer, and 5-long carrier.</span></div>
-              <div class="feature"><b>Clean game room</b><span>Setup happens on Home; battle details stay inside the game page.</span></div>
+              <div class="feature"><b>Real-time combat</b><span>Every shot, turn change, join, and ship placement syncs across connected browsers.</span></div>
+              <div class="feature"><b>Persistent commanders</b><span>Reuse an existing player from the database instead of accidentally creating duplicates.</span></div>
+              <div class="feature"><b>Professional flow</b><span>Sign in first, then manage games in a separate lobby, then battle in a focused game room.</span></div>
             </div>
           </div>
         </section>
 
         <section class="stack">
-          <div class="panel"><div class="panel-inner stack">
-            <div class="section-title"><h3>1. Player</h3><span class="pill" id="savedPlayerPill">Not signed in</span></div>
-            <input id="usernameInput" placeholder="Username, e.g. admiral_jack" maxlength="30" />
-            <button class="btn-primary" id="createPlayerBtn">Create / Use Player</button>
-            <div class="tiny muted">Usernames can contain letters, numbers, and underscores.</div>
+          <div class="panel auth-card"><div class="panel-inner stack">
+            <div class="section-title"><h3>Create New Player</h3><span class="pill">New commander</span></div>
+            <input id="createUsernameInput" placeholder="New username, e.g. admiral_jack" maxlength="30" />
+            <button class="btn-primary" id="createPlayerBtn">Create Player</button>
+            <div class="tiny muted">Use this only for a username that does not exist yet.</div>
           </div></div>
 
-          <div class="panel"><div class="panel-inner stack">
-            <div class="section-title"><h3>2. Create Game</h3><span class="pill">Private by ID or open lobby</span></div>
+          <div class="panel auth-card"><div class="panel-inner stack">
+            <div class="section-title"><h3>Sign In</h3><span class="pill">Existing player</span></div>
+            <input id="loginUsernameInput" placeholder="Existing username" maxlength="30" />
+            <button id="loginPlayerBtn">Sign In</button>
+            <div class="auth-note">Already made a player? Sign in here. This avoids the old problem where reusing a username tried to create a duplicate and showed “username already taken.”</div>
+          </div></div>
+        </section>
+      </div>
+    </main>
+
+    <main id="lobbyPage" class="page">
+      <div class="lobby-grid">
+        <section class="panel welcome-panel">
+          <span class="pill" id="signedInPill">Signed in</span>
+          <h2>Mission Lobby</h2>
+          <p>Create a new battle room, join a game by ID, or enter an open lobby. Your signed-in player will be used for all game actions until you sign out.</p>
+          <div class="feature-row">
+            <div class="feature"><b>Create</b><span>Start a new game with custom grid size and player count.</span></div>
+            <div class="feature"><b>Join</b><span>Use a game ID or pick from open games.</span></div>
+            <div class="feature"><b>Deploy</b><span>Place three ships: length 2, length 3, and length 5.</span></div>
+          </div>
+        </section>
+
+        <section class="stack">
+          <div class="panel lobby-card"><div class="panel-inner stack">
+            <div class="section-title"><h3>Create Game</h3><span class="pill">Private by ID or open lobby</span></div>
             <div class="row">
               <label class="stack tiny muted">Grid size<select id="gridSizeInput"><option>8</option><option>10</option><option>12</option><option>15</option></select></label>
               <label class="stack tiny muted">Players<select id="maxPlayersInput"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label>
@@ -300,8 +340,8 @@
             <button class="btn-primary" id="createGameBtn">Create Game</button>
           </div></div>
 
-          <div class="panel"><div class="panel-inner stack">
-            <div class="section-title"><h3>3. Join Game</h3><button class="btn-small" id="refreshGamesBtn">Refresh</button></div>
+          <div class="panel lobby-card"><div class="panel-inner stack">
+            <div class="section-title"><h3>Join Game</h3><button class="btn-small" id="refreshGamesBtn">Refresh</button></div>
             <div class="row"><input id="joinGameIdInput" placeholder="Enter game ID" /><button id="joinByIdBtn">Join ID</button></div>
             <div class="game-list" id="openGamesList"></div>
           </div></div>
@@ -396,14 +436,44 @@
     }
 
     function showPage(name) {
-      $('homePage').classList.toggle('active', name === 'home');
+      $('authPage').classList.toggle('active', name === 'auth');
+      $('lobbyPage').classList.toggle('active', name === 'lobby');
       $('gamePage').classList.toggle('active', name === 'game');
       document.body.classList.toggle('game-active', name === 'game');
     }
 
     function updateBadges() {
       $('playerBadge').textContent = state.playerId ? `${state.username} #${state.playerId}` : 'No player';
-      $('savedPlayerPill').textContent = state.playerId ? `${state.username} #${state.playerId}` : 'Not signed in';
+      $('signedInPill').textContent = state.playerId ? `Signed in as ${state.username} #${state.playerId}` : 'Signed out';
+      $('signOutBtn').hidden = !state.playerId;
+    }
+
+    function setSession(data) {
+      state.playerId = Number(data.player_id);
+      state.username = data.username || data.displayName || '';
+      state.gameId = null;
+      localStorage.setItem('fc_player_id', state.playerId);
+      localStorage.setItem('fc_username', state.username);
+      localStorage.removeItem('fc_game_id');
+      updateBadges();
+      showPage('lobby');
+      refreshOpenGames();
+    }
+
+    function signOut() {
+      if (state.socket && state.gameId) state.socket.emit('leave_game', { game_id: state.gameId });
+      state.playerId = null;
+      state.username = '';
+      state.gameId = null;
+      state.boards = null;
+      state.moves = [];
+      state.plannedShips = [];
+      localStorage.removeItem('fc_player_id');
+      localStorage.removeItem('fc_username');
+      localStorage.removeItem('fc_game_id');
+      updateBadges();
+      showPage('auth');
+      toast('Signed out.');
     }
 
     function setupSocket() {
@@ -424,19 +494,23 @@
     }
 
     async function createPlayer() {
-      const username = $('usernameInput').value.trim();
-      if (!username) return toast('Enter a username first.');
+      const username = $('createUsernameInput').value.trim();
+      if (!username) return toast('Enter a new username first.');
       const data = await api('/api/players', { method: 'POST', body: JSON.stringify({ username }) });
-      state.playerId = data.player_id;
-      state.username = data.username || username;
-      localStorage.setItem('fc_player_id', state.playerId);
-      localStorage.setItem('fc_username', state.username);
-      updateBadges();
-      toast(`Player ready: ${state.username}`);
+      setSession(data);
+      toast(`Created and signed in as ${state.username}.`);
+    }
+
+    async function loginPlayer() {
+      const username = $('loginUsernameInput').value.trim();
+      if (!username) return toast('Enter an existing username first.');
+      const data = await api('/api/players/login', { method: 'POST', body: JSON.stringify({ username }) });
+      setSession(data);
+      toast(`Signed in as ${state.username}.`);
     }
 
     async function createGame() {
-      if (!state.playerId) return toast('Create a player before creating a game.');
+      if (!state.playerId) { showPage('auth'); return toast('Sign in before creating a game.'); }
       const grid_size = Number($('gridSizeInput').value);
       const max_players = Number($('maxPlayersInput').value);
       const data = await api('/api/games', { method: 'POST', body: JSON.stringify({ creator_id: state.playerId, grid_size, max_players }) });
@@ -445,7 +519,7 @@
     }
 
     async function joinGame(gameId) {
-      if (!state.playerId) return toast('Create a player before joining a game.');
+      if (!state.playerId) { showPage('auth'); return toast('Sign in before joining a game.'); }
       await api(`/api/games/${gameId}/join`, { method: 'POST', body: JSON.stringify({ player_id: state.playerId }) });
       enterGame(gameId);
       toast(`Joined game #${gameId}`);
@@ -461,7 +535,19 @@
       refreshGame(true);
     }
 
+    function leaveRoom() {
+      if (state.socket && state.gameId) state.socket.emit('leave_game', { game_id: state.gameId });
+      localStorage.removeItem('fc_game_id');
+      state.gameId = null;
+      state.boards = null;
+      state.moves = [];
+      state.plannedShips = [];
+      showPage('lobby');
+      refreshOpenGames();
+    }
+
     async function refreshOpenGames() {
+      if (!$('openGamesList')) return;
       const list = $('openGamesList');
       try {
         const data = await api('/api/games');
@@ -503,7 +589,7 @@
         <span class="pill">${data.status.replace('_', ' ')}</span>
         <span class="pill">${data.grid_size}×${data.grid_size}</span>
         <span class="pill">${data.boards.length}/${data.max_players} players</span>
-        <span class="pill">${data.your_turn ? 'Your turn' : data.current_turn_player_id ? `${playerName(data.current_turn_player_id)}\'s turn` : 'Waiting for fleets'}</span>
+        <span class="pill">${data.your_turn ? 'Your turn' : data.current_turn_player_id ? `${playerName(data.current_turn_player_id)}'s turn` : 'Waiting for fleets'}</span>
         ${winner ? `<span class="pill">Winner: ${winner}</span>` : ''}`;
       renderBoards();
       renderStats();
@@ -534,13 +620,6 @@
       });
     }
 
-    function cellPx(size) {
-      if (size <= 8) return 26;
-      if (size <= 10) return 23;
-      if (size <= 12) return 20;
-      return 16;
-    }
-
     function boardHtml(board, size) {
       const data = state.boards;
       const canPlace = data.status === 'waiting_setup' && board.is_viewer && !board.placed;
@@ -558,7 +637,7 @@
       }
       return `<article class="board-card ${board.is_viewer ? 'viewer' : ''} ${board.is_current_turn ? 'current' : ''}">
         <div class="board-head"><div class="board-title"><strong>${board.username}${board.is_viewer ? ' (You)' : ''}</strong><span>${board.placed ? 'Fleet ready' : 'Placing fleet'} · ${board.ships_remaining} cells afloat</span></div><span class="pill">${board.eliminated ? 'Eliminated' : board.is_current_turn ? 'Turn' : `#${board.turn_order + 1}`}</span></div>
-        <div class="grid" style="--grid-size:${size}; --cell-px:${cellPx(size)}px">${cells}</div>
+        <div class="grid" style="--grid-size:${size}">${cells}</div>
       </article>`;
     }
 
@@ -643,14 +722,7 @@
       if (response?.winner_id) state.boards.winner_id = response.winner_id;
 
       const moveNumber = state.moves.length ? Math.max(...state.moves.map(m => Number(m.move_number || 0))) + 1 : 1;
-      state.moves.push({
-        move_number: moveNumber,
-        player_id: state.playerId,
-        target_player_id: Number(target_player_id),
-        row,
-        col,
-        result
-      });
+      state.moves.push({ move_number: moveNumber, player_id: state.playerId, target_player_id: Number(target_player_id), row, col, result });
       renderGame();
     }
 
@@ -686,26 +758,31 @@
     }
 
     $('themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
-    $('homeBtn').onclick = () => showPage('home');
+    $('signOutBtn').onclick = signOut;
     $('createPlayerBtn').onclick = () => createPlayer().catch(err => toast(err.message));
+    $('loginPlayerBtn').onclick = () => loginPlayer().catch(err => toast(err.message));
     $('createGameBtn').onclick = () => createGame().catch(err => toast(err.message));
     $('refreshGamesBtn').onclick = refreshOpenGames;
     $('joinByIdBtn').onclick = () => { const id = Number($('joinGameIdInput').value); id ? joinGame(id).catch(err => toast(err.message)) : toast('Enter a valid game ID.'); };
     $('refreshGameBtn').onclick = () => refreshGame(false);
-    $('leaveGameBtn').onclick = () => { if (state.socket && state.gameId) state.socket.emit('leave_game', { game_id: state.gameId }); localStorage.removeItem('fc_game_id'); state.gameId = null; showPage('home'); refreshOpenGames(); };
+    $('leaveGameBtn').onclick = leaveRoom;
     $('horizontalBtn').onclick = () => { state.orientation = 'horizontal'; toast('Horizontal placement'); };
     $('verticalBtn').onclick = () => { state.orientation = 'vertical'; toast('Vertical placement'); };
     $('clearShipsBtn').onclick = () => { state.plannedShips = []; renderShipPicker(); renderGame(); };
     $('submitShipsBtn').onclick = () => submitShips().catch(err => toast(err.message));
 
     setTheme(localStorage.getItem('fc_theme') || 'dark');
-    if (state.username) $('usernameInput').value = state.username;
+    if (state.username) { $('loginUsernameInput').value = state.username; }
     updateBadges();
     setupSocket();
     renderShipPicker();
-    refreshOpenGames();
-    if (state.gameId && state.playerId) enterGame(state.gameId);
-    state.refreshTimer = setInterval(() => { refreshOpenGames(); if (state.gameId) refreshGame(true); }, 12000);
+    if (state.playerId) {
+      if (state.gameId) enterGame(state.gameId);
+      else { showPage('lobby'); refreshOpenGames(); }
+    } else {
+      showPage('auth');
+    }
+    state.refreshTimer = setInterval(() => { if (state.playerId) refreshOpenGames(); if (state.gameId) refreshGame(true); }, 12000);
   </script>
 </body>
 </html>
