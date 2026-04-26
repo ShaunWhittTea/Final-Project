@@ -666,7 +666,7 @@ def build_boards_payload(cur, game_id, viewer_player_id):
             "is_current_turn": owner_id == current_turn_id,
             "placed": player_has_placed(cur, game_id, owner_id),
             "ships_remaining": ships_remaining_for_player(cur, game_id, owner_id),
-            "eliminated": ships_remaining_for_player(cur, game_id, owner_id) == 0,
+            "eliminated": player_has_placed(cur, game_id, owner_id) and ships_remaining_for_player(cur, game_id, owner_id) == 0,
             "grid": board_matrix_for_viewer(cur, game_id, owner_id, viewer_player_id, game["grid_size"], reveal_all=reveal_all),
         })
 
