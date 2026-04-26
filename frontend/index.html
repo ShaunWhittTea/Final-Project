@@ -110,7 +110,11 @@
       font: inherit;
       outline: none;
     }
-    html[data-theme="light"] button, html[data-theme="light"] input, html[data-theme="light"] select { background: rgba(255,255,255,.8); }
+    html[data-theme="light"] button, html[data-theme="light"] input, html[data-theme="light"] select { background: rgba(255,255,255,.92); color: var(--text); }
+    select option { background: #0f1c34; color: #eff7ff; }
+    html[data-theme="light"] select option { background: #ffffff; color: #0b1930; }
+    html[data-theme="light"] button { color: var(--text); }
+    html[data-theme="light"] .btn-primary { color: #ffffff; }
     input::placeholder { color: var(--soft); }
     button { cursor: pointer; font-weight: 850; transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease; }
     button:hover:not(:disabled) { transform: translateY(-1px); border-color: color-mix(in srgb, var(--accent) 55%, var(--line2)); box-shadow: 0 10px 24px rgba(79,163,255,.18); }
@@ -214,6 +218,29 @@
     .move b.hit { color: #fecaca; }
     html[data-theme="light"] .move b.hit { color: #dc2626; }
     .move b.miss { color: var(--muted); }
+
+    .result-modal {
+      position: fixed; inset: 0; z-index: 50; display: none; place-items: center; padding: 24px;
+      background: radial-gradient(circle at center, rgba(79,163,255,.18), rgba(2,6,23,.72));
+      backdrop-filter: blur(10px);
+    }
+    .result-modal.show { display: grid; }
+    .result-card {
+      width: min(560px, 100%); border: 1px solid var(--line2); border-radius: 32px;
+      background: linear-gradient(180deg, var(--surface2), var(--surface)); box-shadow: var(--shadow);
+      padding: 34px; text-align: center; position: relative; overflow: hidden;
+    }
+    .result-card::before {
+      content: ""; position: absolute; inset: -90px; opacity: .28; pointer-events: none;
+      background: conic-gradient(from 180deg, var(--accent), var(--accent2), var(--success), var(--accent));
+      filter: blur(42px);
+    }
+    .result-content { position: relative; z-index: 1; }
+    .result-icon { font-size: 62px; margin-bottom: 8px; }
+    .result-title { font-size: clamp(42px, 7vw, 76px); line-height: .9; letter-spacing: -.08em; margin: 0; }
+    .result-message { color: var(--muted); font-size: 16px; line-height: 1.55; font-weight: 700; max-width: 440px; margin: 16px auto 22px; }
+    .result-actions { display:flex; gap: 10px; justify-content:center; flex-wrap:wrap; }
+    .result-card.defeat::before { background: conic-gradient(from 180deg, var(--danger), #7f1d1d, var(--warn), var(--danger)); }
 
     .toast { position: fixed; right: 20px; bottom: 20px; z-index: 20; display:grid; gap: 10px; }
     .toast div { max-width: 420px; padding: 13px 15px; border-radius: 16px; background: var(--surface2); border:1px solid var(--line2); box-shadow: var(--shadow2); font-weight: 800; }
@@ -386,6 +413,20 @@
     </main>
   </div>
 
+  <div class="result-modal" id="resultModal" aria-hidden="true">
+    <div class="result-card" id="resultCard">
+      <div class="result-content">
+        <div class="result-icon" id="resultIcon">🏆</div>
+        <h2 class="result-title" id="resultTitle">Victory</h2>
+        <p class="result-message" id="resultMessage">The battle is over.</p>
+        <div class="result-actions">
+          <button class="btn-primary" id="resultLobbyBtn">Return to Lobby</button>
+          <button id="resultCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
@@ -405,7 +446,8 @@
       activeShip: 'patrol',
       orientation: 'horizontal',
       socket: null,
-      refreshTimer: null
+      refreshTimer: null,
+      lastResultModalKey: null
     };
 
     const $ = id => document.getElementById(id);
@@ -468,6 +510,8 @@
       state.boards = null;
       state.moves = [];
       state.plannedShips = [];
+      state.lastResultModalKey = null;
+      hideResultModal();
       localStorage.removeItem('fc_player_id');
       localStorage.removeItem('fc_username');
       localStorage.removeItem('fc_game_id');
@@ -542,6 +586,8 @@
       state.boards = null;
       state.moves = [];
       state.plannedShips = [];
+      state.lastResultModalKey = null;
+      hideResultModal();
       showPage('lobby');
       refreshOpenGames();
     }
@@ -580,6 +626,34 @@
       }
     }
 
+    function showResultModal(kind, winnerName) {
+      const isVictory = kind === 'victory';
+      $('resultCard').className = `result-card ${isVictory ? 'victory' : 'defeat'}`;
+      $('resultIcon').textContent = isVictory ? '🏆' : '🌊';
+      $('resultTitle').textContent = isVictory ? 'Victory' : 'Defeat';
+      $('resultMessage').textContent = isVictory
+        ? `Mission complete. ${winnerName || 'Your fleet'} controls the sea. Return to the lobby to launch another battle, or close this popup to review the final board.`
+        : `${winnerName || 'Another commander'} won this battle. Return to the lobby for a rematch, or close this popup to review the move history.`;
+      $('resultModal').classList.add('show');
+      $('resultModal').setAttribute('aria-hidden', 'false');
+    }
+
+    function hideResultModal() {
+      const modal = $('resultModal');
+      if (!modal) return;
+      modal.classList.remove('show');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+
+    function maybeShowGameOverModal(data) {
+      if (!data || data.status !== 'finished' || !data.winner_id || !state.playerId) return;
+      const key = `${data.game_id}:${data.winner_id}`;
+      if (state.lastResultModalKey === key) return;
+      state.lastResultModalKey = key;
+      const kind = Number(data.winner_id) === Number(state.playerId) ? 'victory' : 'defeat';
+      showResultModal(kind, playerName(data.winner_id));
+    }
+
     function renderGame() {
       const data = state.boards;
       if (!data) return;
@@ -594,6 +668,7 @@
       renderBoards();
       renderStats();
       renderHistory();
+      maybeShowGameOverModal(data);
       const viewerBoard = data.boards.find(b => b.is_viewer);
       const canPlace = data.status === 'waiting_setup' && viewerBoard && !viewerBoard.placed;
       $('placementPill').textContent = canPlace ? 'Place fleet' : viewerBoard?.placed ? 'Fleet submitted' : 'Locked';
@@ -622,8 +697,9 @@
 
     function boardHtml(board, size) {
       const data = state.boards;
+      const boardEliminated = board.placed && board.eliminated;
       const canPlace = data.status === 'waiting_setup' && board.is_viewer && !board.placed;
-      const canShoot = data.status === 'playing' && data.your_turn && !board.is_viewer && !board.eliminated;
+      const canShoot = data.status === 'playing' && data.your_turn && !board.is_viewer && !boardEliminated;
       const planned = board.is_viewer ? plannedCellSet() : new Set();
       let cells = '';
       for (let r = 0; r < size; r++) {
@@ -636,7 +712,7 @@
         }
       }
       return `<article class="board-card ${board.is_viewer ? 'viewer' : ''} ${board.is_current_turn ? 'current' : ''}">
-        <div class="board-head"><div class="board-title"><strong>${board.username}${board.is_viewer ? ' (You)' : ''}</strong><span>${board.placed ? 'Fleet ready' : 'Placing fleet'} · ${board.ships_remaining} cells afloat</span></div><span class="pill">${board.eliminated ? 'Eliminated' : board.is_current_turn ? 'Turn' : `#${board.turn_order + 1}`}</span></div>
+        <div class="board-head"><div class="board-title"><strong>${board.username}${board.is_viewer ? ' (You)' : ''}</strong><span>${board.placed ? 'Fleet ready' : 'Placing ships'} · ${board.placed ? `${board.ships_remaining} cells afloat` : 'waiting for deployment'}</span></div><span class="pill">${!board.placed ? 'Placing ships' : boardEliminated ? 'Eliminated' : board.is_current_turn ? 'Turn' : `#${board.turn_order + 1}`}</span></div>
         <div class="grid" style="--grid-size:${size}">${cells}</div>
       </article>`;
     }
@@ -742,7 +818,7 @@
         const hits = shots.filter(m => m.result === 'hit').length;
         const accuracy = shots.length ? Math.round((hits / shots.length) * 100) : 0;
         return `<div class="stat-card"><strong>${p.username}${p.is_viewer ? ' (You)' : ''}</strong>
-          <div class="stat-line"><span>Status</span><b>${p.eliminated ? 'Eliminated' : p.placed ? 'Active' : 'Setup'}</b></div>
+          <div class="stat-line"><span>Status</span><b>${!p.placed ? 'Placing ships' : p.eliminated ? 'Eliminated' : 'Active'}</b></div>
           <div class="stat-line"><span>Ships afloat</span><b>${p.ships_remaining}</b></div>
           <div class="stat-line"><span>Shots</span><b>${shots.length}</b></div>
           <div class="stat-line"><span>Hits</span><b>${hits}</b></div>
@@ -758,6 +834,9 @@
     }
 
     $('themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+    $('resultCloseBtn').onclick = hideResultModal;
+    $('resultLobbyBtn').onclick = leaveRoom;
+    $('resultModal').onclick = e => { if (e.target.id === 'resultModal') hideResultModal(); };
     $('signOutBtn').onclick = signOut;
     $('createPlayerBtn').onclick = () => createPlayer().catch(err => toast(err.message));
     $('loginPlayerBtn').onclick = () => loginPlayer().catch(err => toast(err.message));
