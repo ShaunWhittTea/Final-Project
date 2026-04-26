@@ -120,6 +120,18 @@
     button:hover:not(:disabled) { transform: translateY(-1px); border-color: color-mix(in srgb, var(--accent) 55%, var(--line2)); box-shadow: 0 10px 24px rgba(79,163,255,.18); }
     button:disabled { cursor:not-allowed; opacity:.48; }
     .btn-primary { border: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; }
+    html[data-theme="light"] .btn-primary,
+    html[data-theme="light"] button.btn-primary {
+      background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+      color: #ffffff !important;
+      -webkit-text-fill-color: #ffffff;
+      border-color: transparent !important;
+      box-shadow: 0 14px 30px rgba(37, 99, 235, .25);
+    }
+    html[data-theme="light"] button:not(.btn-primary):not(.btn-danger) {
+      background: #ffffff;
+      color: #0b1930;
+    }
     .btn-danger { border-color: rgba(239,68,68,.5); color: #fecaca; background: rgba(239,68,68,.12); }
     html[data-theme="light"] .btn-danger { color: #991b1b; }
     .btn-small { min-height: 36px; padding: 8px 11px; border-radius: 12px; font-size: 13px; }
@@ -277,6 +289,8 @@
     .auth-card h3, .lobby-card h3 { font-size: 23px; }
     .auth-actions { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .auth-note { padding: 13px 15px; border-radius: 18px; border: 1px solid var(--line); background: rgba(255,255,255,.055); color: var(--muted); font-weight: 650; line-height: 1.45; }
+    .server-card input { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .server-current { word-break: break-all; }
     .lobby-grid { display:grid; grid-template-columns: .9fr 1.1fr; gap:16px; align-items:start; }
     .welcome-panel { padding: 28px; }
     .welcome-panel h2 { font-size: clamp(34px, 4vw, 58px); line-height: .95; margin-bottom: 12px; }
@@ -315,7 +329,6 @@
       <div class="home-grid">
         <section class="panel hero">
           <div>
-            <span class="pill">Live WebSocket fleet combat</span>
             <h2>Command your fleet. Sink every rival.</h2>
             <p>Sign in to your existing commander profile or create a new one. After signing in, you will move to the mission lobby where you can create a game, join by ID, or enter an open battle.</p>
             <div class="feature-row">
@@ -327,6 +340,13 @@
         </section>
 
         <section class="stack">
+          <div class="panel auth-card server-card"><div class="panel-inner stack">
+            <div class="section-title"><h3>Server</h3><span class="pill">Connect to a class server</span></div>
+            <input id="serverUrlInput" placeholder="Leave blank for this server, or enter https://example.onrender.com" />
+            <button id="saveServerBtn">Use Server</button>
+            <div class="tiny muted server-current" id="serverCurrentText">Using this app server.</div>
+          </div></div>
+
           <div class="panel auth-card"><div class="panel-inner stack">
             <div class="section-title"><h3>Create New Player</h3><span class="pill">New commander</span></div>
             <input id="createUsernameInput" placeholder="New username, e.g. admiral_jack" maxlength="30" />
@@ -338,7 +358,7 @@
             <div class="section-title"><h3>Sign In</h3><span class="pill">Existing player</span></div>
             <input id="loginUsernameInput" placeholder="Existing username" maxlength="30" />
             <button id="loginPlayerBtn">Sign In</button>
-            <div class="auth-note">Already made a player? Sign in here. This avoids the old problem where reusing a username tried to create a duplicate and showed “username already taken.”</div>
+            <div class="auth-note">Already made a player? Sign in here.</div>
           </div></div>
         </section>
       </div>
@@ -447,7 +467,8 @@
       orientation: 'horizontal',
       socket: null,
       refreshTimer: null,
-      lastResultModalKey: null
+      lastResultModalKey: null,
+      serverUrl: localStorage.getItem('fc_server_url') || ''
     };
 
     const $ = id => document.getElementById(id);
@@ -460,8 +481,41 @@
       setTimeout(() => el.remove(), 3600);
     }
 
+    function normalizeServerUrl(value) {
+      let url = (value || '').trim();
+      if (!url) return '';
+      if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+      return url.replace(/\/+$/, '');
+    }
+
+    function apiUrl(path) {
+      return `${state.serverUrl || ''}${path}`;
+    }
+
+    function updateServerUi() {
+      if ($('serverUrlInput')) $('serverUrlInput').value = state.serverUrl;
+      if ($('serverCurrentText')) {
+        $('serverCurrentText').textContent = state.serverUrl
+          ? `Using external server: ${state.serverUrl}`
+          : 'Using this app server.';
+      }
+    }
+
+    function saveServer() {
+      state.serverUrl = normalizeServerUrl($('serverUrlInput').value);
+      if (state.serverUrl) localStorage.setItem('fc_server_url', state.serverUrl);
+      else localStorage.removeItem('fc_server_url');
+      if (state.socket) {
+        state.socket.disconnect();
+        state.socket = null;
+      }
+      setupSocket();
+      updateServerUi();
+      toast(state.serverUrl ? `Using ${state.serverUrl}` : 'Using this app server.');
+    }
+
     async function api(path, options = {}) {
-      const res = await fetch(path, {
+      const res = await fetch(apiUrl(path), {
         headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
         ...options
       });
@@ -525,7 +579,8 @@
         $('socketStatus').textContent = '● Offline fallback';
         return;
       }
-      state.socket = io({ transports: ['websocket', 'polling'] });
+      if (state.socket) state.socket.disconnect();
+      state.socket = io(state.serverUrl || undefined, { transports: ['websocket', 'polling'] });
       state.socket.on('connect', () => {
         $('socketStatus').textContent = '● Live';
         if (state.gameId) state.socket.emit('watch_game', { game_id: state.gameId });
@@ -548,7 +603,16 @@
     async function loginPlayer() {
       const username = $('loginUsernameInput').value.trim();
       if (!username) return toast('Enter an existing username first.');
-      const data = await api('/api/players/login', { method: 'POST', body: JSON.stringify({ username }) });
+      let data;
+      try {
+        data = await api('/api/players/login', { method: 'POST', body: JSON.stringify({ username }) });
+      } catch (err) {
+        const list = await api('/api/players');
+        const players = list.players || [];
+        const found = players.find(p => String(p.username || '').toLowerCase() === username.toLowerCase());
+        if (!found) throw new Error('That username was not found on this server.');
+        data = { player_id: found.player_id, username: found.username };
+      }
       setSession(data);
       toast(`Signed in as ${state.username}.`);
     }
@@ -838,6 +902,7 @@
     $('resultLobbyBtn').onclick = leaveRoom;
     $('resultModal').onclick = e => { if (e.target.id === 'resultModal') hideResultModal(); };
     $('signOutBtn').onclick = signOut;
+    $('saveServerBtn').onclick = saveServer;
     $('createPlayerBtn').onclick = () => createPlayer().catch(err => toast(err.message));
     $('loginPlayerBtn').onclick = () => loginPlayer().catch(err => toast(err.message));
     $('createGameBtn').onclick = () => createGame().catch(err => toast(err.message));
@@ -851,6 +916,7 @@
     $('submitShipsBtn').onclick = () => submitShips().catch(err => toast(err.message));
 
     setTheme(localStorage.getItem('fc_theme') || 'dark');
+    updateServerUi();
     if (state.username) { $('loginUsernameInput').value = state.username; }
     updateBadges();
     setupSocket();
