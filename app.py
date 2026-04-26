@@ -15,8 +15,8 @@ TEST_MODE = os.getenv("TEST_MODE", "true").lower() == "true"
 TEST_PASSWORD = os.getenv("TEST_PASSWORD", "clemson-test-2026")
 AUTO_RESET_ON_START = os.getenv("AUTO_RESET_ON_START", "true").lower() == "true"
 
-API_VERSION = "2.8.1"
-SPEC_VERSION = "2.8.1"
+API_VERSION = "2.9.0"
+SPEC_VERSION = "2.9.0"
 APP_START_TIME = time.time()
 INITIAL_RESET_DONE = False
 
@@ -799,6 +799,36 @@ def system_reset():
         print(f"System reset error: {ex}")
         return error_response("internal_error", "Failed to reset system", 500)
 
+
+
+@app.post("/api/players/login")
+def login_player():
+    data = parse_json()
+    username = data.get("username") or data.get("playerName")
+
+    if username is None:
+        return error_response("username required", "username required", 400)
+
+    if not isinstance(username, str) or not username.strip():
+        return error_response("username required", "username required", 400)
+
+    username = username.strip()
+
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                player = get_player_row_by_username(cur, username)
+                if not player:
+                    return error_response("not_found", "Player does not exist. Create the player first.", 404)
+
+        return jsonify({
+            "player_id": player["player_id"],
+            "username": player["username"],
+            "displayName": player["username"],
+        }), 200
+    except Exception as ex:
+        print(f"Login player error: {ex}")
+        return error_response("internal_error", "Failed to sign in player", 500)
 
 @app.post("/api/players")
 def create_player():
