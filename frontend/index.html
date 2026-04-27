@@ -317,9 +317,7 @@
     #signOutBtn[hidden] { display:none; }
     @media (max-width: 980px) { .lobby-grid, .auth-actions { grid-template-columns: 1fr; } }
 
-      a.btn-primary { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
-    .stats-nav-link { width: 100%; margin-top: 10px; }
-</style>
+  </style>
 </head>
 <body>
   <div class="app">
@@ -396,9 +394,10 @@
           </div>
 
           <div class="panel lobby-card"><div class="panel-inner stack">
-            <div class="section-title"><h3>All-Time Stats</h3><span class="pill">Records</span></div>
-            <p class="tiny muted">View your career stats and the all-time leaderboard for the current server.</p>
-            <a class="btn-primary stats-nav-link" id="openStatsPageBtn" href="#stats" role="button">Open Stats & Leaderboard</a>
+            <div class="section-title"><h3>All-Time Leaderboard</h3><button class="btn-small" id="refreshLeaderboardBtn">Refresh</button></div>
+            <div class="self-stats-grid" id="myAllTimeStats"></div>
+            <div class="leaderboard-list" id="allTimeLeaderboard"></div>
+            <div class="tiny muted">View all-time player stats and rankings for the current server.</div>
           </div></div>
         </section>
 
@@ -419,26 +418,6 @@
           </div></div>
         </section>
       </div>
-    </main>
-
-    <main id="statsPage" class="page">
-      <section class="panel game-header">
-        <div>
-          <h2>All-Time Stats & Leaderboard</h2>
-          <div class="status-strip"><span class="pill" id="statsServerPill">Current server</span></div>
-        </div>
-        <div class="controls"><button id="refreshLeaderboardBtn">Refresh</button><button id="backToLobbyFromStatsBtn">Back to lobby</button></div>
-      </section>
-
-      <section class="panel lobby-card"><div class="panel-inner stack">
-        <div class="section-title"><h3>Your All-Time Stats</h3><span class="pill" id="statsPlayerPill">Signed in</span></div>
-        <div class="self-stats-grid" id="myAllTimeStats"></div>
-      </div></section>
-
-      <section class="panel lobby-card"><div class="panel-inner stack">
-        <div class="section-title"><h3>All-Time Leaderboard</h3><span class="pill">All players</span></div>
-        <div class="leaderboard-list" id="allTimeLeaderboard"></div>
-      </div></section>
     </main>
 
     <main id="gamePage" class="page">
@@ -803,7 +782,6 @@
     function showPage(name) {
       $('authPage').classList.toggle('active', name === 'auth');
       $('lobbyPage').classList.toggle('active', name === 'lobby');
-      $('statsPage').classList.toggle('active', name === 'stats');
       $('gamePage').classList.toggle('active', name === 'game');
       document.body.classList.toggle('game-active', name === 'game');
     }
@@ -813,15 +791,6 @@
       $('signedInPill').textContent = state.playerId ? `Signed in as ${state.username} #${state.playerId}` : 'Signed out';
       $('signOutBtn').hidden = !state.playerId;
     }
-
-    function openStatsPage() {
-      if (!state.playerId) { toast('Sign in before viewing stats.'); return; }
-      $('statsServerPill').textContent = serverBase();
-      $('statsPlayerPill').textContent = `${state.username || 'Player'} #${state.playerId}`;
-      showPage('stats');
-      refreshLeaderboard().catch(err => toast(err.message));
-    }
-    window.openStatsPage = openStatsPage;
 
     function setSession(data) {
       state.playerId = Number(data.player_id ?? data.id ?? data.playerId ?? data.player?.player_id ?? data.data?.player_id);
@@ -1563,28 +1532,6 @@
     $('loginPlayerBtn').onclick = () => loginPlayer().catch(err => toast(err.message));
     $('createGameBtn').onclick = () => createGame().catch(err => toast(err.message));
     $('refreshGamesBtn').onclick = refreshOpenGames;
-    function goToStatsPage(event) {
-      if (event) event.preventDefault();
-      if (!state.playerId) { toast('Sign in before viewing stats.'); return; }
-      if (location.hash !== '#stats') {
-        location.hash = 'stats';
-      }
-      openStatsPage();
-    }
-
-    function goToLobbyPage(event) {
-      if (event) event.preventDefault();
-      if (location.hash !== '#lobby') location.hash = 'lobby';
-      showPage('lobby');
-      refreshOpenGames();
-    }
-
-    $('openStatsPageBtn').addEventListener('click', goToStatsPage);
-    document.addEventListener('click', event => {
-      const statsLink = event.target.closest && event.target.closest('[data-nav="stats"], #openStatsPageBtn, a[href="#stats"]');
-      if (statsLink) goToStatsPage(event);
-    });
-    $('backToLobbyFromStatsBtn').onclick = goToLobbyPage;
     $('refreshLeaderboardBtn').onclick = () => refreshLeaderboard();
     $('joinByIdBtn').onclick = () => { const id = Number($('joinGameIdInput').value); id ? joinGame(id).catch(err => toast(err.message)) : toast('Enter a valid game ID.'); };
     $('refreshGameBtn').onclick = () => refreshGame(false);
@@ -1612,19 +1559,6 @@
       if (state.gameId && !state.socketLive) refreshGame(true);
     }, 2500);
     setInterval(() => { if (state.playerId && !state.gameId) refreshOpenGames(); }, 12000);
-
-    function handleHashRoute() {
-      const route = (location.hash || '').replace('#', '').toLowerCase();
-      if (route === 'stats') {
-        if (state.playerId) openStatsPage();
-        else { showPage('auth'); toast('Sign in before viewing stats.'); }
-      } else if (route === 'lobby') {
-        if (state.playerId) { showPage('lobby'); refreshOpenGames(); }
-        else showPage('auth');
-      }
-    }
-    window.addEventListener('hashchange', handleHashRoute);
-
     setInterval(() => { if (state.playerId && !state.gameId) refreshLeaderboard(); }, 60000);
   </script>
 </body>
