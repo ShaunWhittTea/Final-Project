@@ -175,6 +175,18 @@
     .game-card { display:flex; justify-content:space-between; align-items:center; gap:10px; padding: 14px; border-radius: 18px; background: rgba(255,255,255,.055); border:1px solid var(--line); }
     .game-card strong { display:block; margin-bottom: 4px; }
 
+    .leaderboard-list { display:grid; gap:8px; }
+    .leaderboard-row { display:grid; grid-template-columns: auto 1fr auto; gap:10px; align-items:center; padding:10px 12px; border-radius:16px; border:1px solid var(--line); background: rgba(255,255,255,.055); }
+    .leaderboard-rank { width:28px; height:28px; border-radius:999px; display:grid; place-items:center; font-weight:900; background: rgba(79,163,255,.14); color: var(--accent); border:1px solid var(--line2); }
+    .leaderboard-name { font-weight:900; }
+    .leaderboard-meta { margin-top:3px; color:var(--muted); font-size:12px; font-weight:650; }
+    .leaderboard-score { text-align:right; font-weight:900; }
+    .leaderboard-score span { display:block; color:var(--muted); font-size:11px; margin-top:2px; }
+    .self-stats-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; }
+    .self-stat { padding:10px 12px; border-radius:16px; border:1px solid var(--line); background: rgba(255,255,255,.055); }
+    .self-stat b { display:block; font-size:18px; }
+    .self-stat span { color:var(--muted); font-size:12px; font-weight:700; }
+
     .game-shell { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; height: calc(100vh - 96px); min-height: 0; overflow: hidden; }
     .game-header { display:grid; grid-template-columns: 1fr auto; gap: 10px; align-items:center; padding: 12px 14px; }
     .status-strip { display:flex; flex-wrap:wrap; gap: 7px; margin-top: 8px; }
@@ -369,15 +381,24 @@
 
     <main id="lobbyPage" class="page">
       <div class="lobby-grid">
-        <section class="panel welcome-panel">
-          <span class="pill" id="signedInPill">Signed in</span>
-          <h2>Mission Lobby</h2>
-          <p>Create a new battle room, join a game by ID, or enter an open lobby. Your signed-in player will be used for all game actions until you sign out.</p>
-          <div class="feature-row">
-            <div class="feature"><b>Create</b><span>Start a new game with custom grid size and player count.</span></div>
-            <div class="feature"><b>Join</b><span>Use a game ID or pick from open games.</span></div>
-            <div class="feature"><b>Deploy</b><span>Place three ships: length 2, length 3, and length 5.</span></div>
+        <section class="stack">
+          <div class="panel welcome-panel">
+            <span class="pill" id="signedInPill">Signed in</span>
+            <h2>Mission Lobby</h2>
+            <p>Create a new battle room, join a game by ID, or enter an open lobby. Your signed-in player will be used for all game actions until you sign out.</p>
+            <div class="feature-row">
+              <div class="feature"><b>Create</b><span>Start a new game with custom grid size and player count.</span></div>
+              <div class="feature"><b>Join</b><span>Use a game ID or pick from open games.</span></div>
+              <div class="feature"><b>Deploy</b><span>Place three ships: length 2, length 3, and length 5.</span></div>
+            </div>
           </div>
+
+          <div class="panel lobby-card"><div class="panel-inner stack">
+            <div class="section-title"><h3>All-Time Leaderboard</h3><button class="btn-small" id="refreshLeaderboardBtn">Refresh</button></div>
+            <div class="self-stats-grid" id="myAllTimeStats"></div>
+            <div class="leaderboard-list" id="allTimeLeaderboard"></div>
+            <div class="tiny muted">Uses <b>GET /api/players/{player_id}/stats</b>. If a server does not list players, the client scans common player IDs.</div>
+          </div></div>
         </section>
 
         <section class="stack">
@@ -494,7 +515,8 @@
       socketLive: false,
       refreshTimer: null,
       lastResultModalKey: null,
-      serverUrl: localStorage.getItem('fc_server_url') || DEFAULT_SERVER_URL
+      serverUrl: localStorage.getItem('fc_server_url') || DEFAULT_SERVER_URL,
+      leaderboardLoading: false
     };
 
     const $ = id => document.getElementById(id);
@@ -628,6 +650,109 @@
       return [];
     }
 
+
+    function asArrayOfPlayers(data) {
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.players)) return data.players;
+      if (Array.isArray(data?.data)) return data.data;
+      if (Array.isArray(data?.results)) return data.results;
+      return [];
+    }
+
+    function normalizePlayerId(raw) {
+      const id = Number(raw?.player_id ?? raw?.id ?? raw?.playerId);
+      return Number.isFinite(id) && id > 0 ? id : null;
+    }
+
+    function normalizeStats(id, raw, username = '') {
+      const games = Number(raw?.games_played ?? raw?.total_games ?? raw?.games ?? 0) || 0;
+      const wins = Number(raw?.wins ?? raw?.total_wins ?? 0) || 0;
+      const losses = Number(raw?.losses ?? raw?.total_losses ?? 0) || 0;
+      const shots = Number(raw?.total_shots ?? raw?.shots ?? raw?.total_moves ?? 0) || 0;
+      const hits = Number(raw?.total_hits ?? raw?.hits ?? 0) || 0;
+      const accRaw = raw?.accuracy;
+      const accuracy = Number.isFinite(Number(accRaw)) ? Number(accRaw) : (shots ? hits / shots : 0);
+      return { player_id: Number(id), username: username || raw?.username || raw?.name || `Player #${id}`, games_played: games, wins, losses, total_shots: shots, total_hits: hits, accuracy };
+    }
+
+    async function discoverPlayerIdsForStats() {
+      const ids = new Map();
+      if (state.playerId) ids.set(Number(state.playerId), state.username || `Player #${state.playerId}`);
+
+      try {
+        const playersData = await api('/api/players');
+        for (const p of asArrayOfPlayers(playersData)) {
+          const id = normalizePlayerId(p);
+          if (id) ids.set(id, p.username || p.name || ids.get(id) || `Player #${id}`);
+        }
+      } catch (_) {
+        // Official compatibility path: /api/players is not required, so scan common IDs.
+      }
+
+      if (ids.size < 2) {
+        for (let id = 1; id <= 60; id++) ids.set(id, ids.get(id) || `Player #${id}`);
+      }
+      return [...ids.entries()].map(([id, username]) => ({ id, username }));
+    }
+
+    async function refreshLeaderboard() {
+      if (!$('allTimeLeaderboard') || state.leaderboardLoading) return;
+      state.leaderboardLoading = true;
+      $('allTimeLeaderboard').innerHTML = '<div class="tiny muted">Loading all-time stats...</div>';
+      if ($('myAllTimeStats')) $('myAllTimeStats').innerHTML = '';
+
+      try {
+        const candidates = await discoverPlayerIdsForStats();
+        const results = [];
+        const batchSize = 8;
+        for (let i = 0; i < candidates.length; i += batchSize) {
+          const batch = candidates.slice(i, i + batchSize);
+          const batchResults = await Promise.all(batch.map(async p => {
+            try {
+              const stats = await api(`/api/players/${p.id}/stats`);
+              return normalizeStats(p.id, stats, p.username);
+            } catch (_) {
+              return null;
+            }
+          }));
+          results.push(...batchResults.filter(Boolean));
+        }
+
+        const active = results.filter(p => p.games_played || p.wins || p.losses || p.total_shots || p.total_hits || Number(p.player_id) === Number(state.playerId));
+        active.sort((a, b) => (b.wins - a.wins) || (b.games_played - a.games_played) || (b.total_hits - a.total_hits) || (b.accuracy - a.accuracy));
+        renderAllTimeStats(active);
+      } catch (err) {
+        $('allTimeLeaderboard').innerHTML = `<div class="tiny muted">Could not load leaderboard: ${err.message}</div>`;
+      } finally {
+        state.leaderboardLoading = false;
+      }
+    }
+
+    function renderAllTimeStats(players) {
+      const mine = players.find(p => Number(p.player_id) === Number(state.playerId));
+      if ($('myAllTimeStats')) {
+        $('myAllTimeStats').innerHTML = mine ? `
+          <div class="self-stat"><b>${mine.games_played}</b><span>Your games</span></div>
+          <div class="self-stat"><b>${mine.wins}</b><span>Your wins</span></div>
+          <div class="self-stat"><b>${mine.total_hits}/${mine.total_shots}</b><span>Your hits/shots</span></div>
+          <div class="self-stat"><b>${Math.round((mine.accuracy || 0) * 100)}%</b><span>Your accuracy</span></div>
+        ` : '<div class="tiny muted">Your all-time stats are not available on this server yet.</div>';
+      }
+
+      const top = players.slice(0, 12);
+      if (!top.length) {
+        $('allTimeLeaderboard').innerHTML = '<div class="tiny muted">No all-time stats found yet. Play a game, then refresh the leaderboard.</div>';
+        return;
+      }
+      $('allTimeLeaderboard').innerHTML = top.map((p, idx) => `
+        <div class="leaderboard-row ${Number(p.player_id) === Number(state.playerId) ? 'viewer' : ''}">
+          <div class="leaderboard-rank">${idx + 1}</div>
+          <div><div class="leaderboard-name">${p.username}${Number(p.player_id) === Number(state.playerId) ? ' (You)' : ''}</div><div class="leaderboard-meta">#${p.player_id} · ${p.games_played} games · ${p.losses} losses · ${Math.round((p.accuracy || 0) * 100)}% accuracy</div></div>
+          <div class="leaderboard-score">${p.wins}<span>wins</span></div>
+        </div>
+      `).join('');
+    }
+
     function normalizeLobbyGame(raw) {
       const game_id = Number(raw?.game_id ?? raw?.id ?? raw?.gameId);
       const grid_size = Number(raw?.grid_size ?? raw?.size ?? raw?.board_size ?? raw?.gridSize ?? 8);
@@ -677,6 +802,7 @@
       updateBadges();
       showPage('lobby');
       refreshOpenGames();
+      refreshLeaderboard();
     }
 
     function signOut() {
@@ -832,6 +958,7 @@
       hideResultModal();
       showPage('lobby');
       refreshOpenGames();
+      refreshLeaderboard();
     }
 
     async function refreshOpenGames() {
@@ -1405,6 +1532,7 @@
     $('loginPlayerBtn').onclick = () => loginPlayer().catch(err => toast(err.message));
     $('createGameBtn').onclick = () => createGame().catch(err => toast(err.message));
     $('refreshGamesBtn').onclick = refreshOpenGames;
+    $('refreshLeaderboardBtn').onclick = () => refreshLeaderboard();
     $('joinByIdBtn').onclick = () => { const id = Number($('joinGameIdInput').value); id ? joinGame(id).catch(err => toast(err.message)) : toast('Enter a valid game ID.'); };
     $('refreshGameBtn').onclick = () => refreshGame(false);
     $('leaveGameBtn').onclick = leaveRoom;
@@ -1422,7 +1550,7 @@
     renderShipPicker();
     if (state.playerId) {
       if (state.gameId) enterGame(state.gameId);
-      else { showPage('lobby'); refreshOpenGames(); }
+      else { showPage('lobby'); refreshOpenGames(); refreshLeaderboard(); }
     } else {
       showPage('auth');
     }
@@ -1431,6 +1559,7 @@
       if (state.gameId && !state.socketLive) refreshGame(true);
     }, 2500);
     setInterval(() => { if (state.playerId && !state.gameId) refreshOpenGames(); }, 12000);
+    setInterval(() => { if (state.playerId && !state.gameId) refreshLeaderboard(); }, 60000);
   </script>
 </body>
 </html>
