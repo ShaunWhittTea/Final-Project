@@ -552,6 +552,7 @@
     }
 
     function clearLocalSessionForServerChange() {
+      clearAllFleetCommandGameStorage();
       if (state.socket && state.gameId) state.socket.emit('leave_game', { game_id: state.gameId });
       state.playerId = null;
       state.username = '';
@@ -679,6 +680,7 @@
     }
 
     function signOut() {
+      clearAllFleetCommandGameStorage();
       if (state.socket && state.gameId) state.socket.emit('leave_game', { game_id: state.gameId });
       state.playerId = null;
       state.username = '';
@@ -820,6 +822,7 @@
 
     function leaveRoom() {
       if (state.socket && state.gameId) state.socket.emit('leave_game', { game_id: state.gameId });
+      clearCurrentGameBrowserData(state.gameId, state.playerId);
       localStorage.removeItem('fc_game_id');
       state.gameId = null;
       state.boards = null;
@@ -888,6 +891,41 @@
 
     function isLocallyJoined(gameId = state.gameId, playerId = state.playerId) {
       return !!(gameId && playerId && localStorage.getItem(membershipKey(gameId, playerId)) === '1');
+    }
+
+    function clearCurrentGameBrowserData(gameId = state.gameId, playerId = state.playerId) {
+      const server = encodeURIComponent(state.serverUrl || DEFAULT_SERVER_URL);
+      const gid = Number(gameId);
+      const pid = Number(playerId);
+
+      if (gid && pid) {
+        localStorage.removeItem(`fc_local_${server}_${gid}_${pid}_ships`);
+        localStorage.removeItem(`fc_local_${server}_${gid}_${pid}_shots`);
+        localStorage.removeItem(`fc_member_${server}_${gid}_${pid}`);
+      }
+
+      if (gid) {
+        for (const key of Object.keys(localStorage)) {
+          const isSameServerGame =
+            key.startsWith(`fc_local_${server}_${gid}_`) ||
+            key.startsWith(`fc_member_${server}_${gid}_`);
+          if (isSameServerGame) localStorage.removeItem(key);
+        }
+      }
+
+      if (Number(state.gameId) === gid) localStorage.removeItem('fc_game_id');
+    }
+
+    function clearAllFleetCommandGameStorage() {
+      for (const key of Object.keys(localStorage)) {
+        if (
+          key.startsWith('fc_local_') ||
+          key.startsWith('fc_member_') ||
+          key === 'fc_game_id'
+        ) {
+          localStorage.removeItem(key);
+        }
+      }
     }
 
     function isAlreadyJoinedError(err) {
@@ -1134,6 +1172,7 @@
       if (state.lastResultModalKey === key) return;
       state.lastResultModalKey = key;
       const kind = Number(data.winner_id) === Number(state.playerId) ? 'victory' : 'defeat';
+      clearCurrentGameBrowserData(data.game_id || state.gameId, state.playerId);
       showResultModal(kind, playerName(data.winner_id));
     }
 
