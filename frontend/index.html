@@ -981,17 +981,34 @@
 
     function buildLocalBoards(game, rawMoves) {
       const size = Number(game.grid_size || game.size || 8);
-      const players = (game.players || []).map((p, idx) => ({
-        player_id: Number(p.player_id ?? p.id),
-        username: p.username || p.name || `Player ${p.player_id ?? p.id}`,
-        turn_order: idx,
-        ships_remaining: Number(p.ships_remaining ?? p.remaining_ships ?? 0),
-        placed: Number(p.ships_remaining ?? p.remaining_ships ?? -1) >= 0,
-        eliminated: Number(p.ships_remaining ?? p.remaining_ships ?? 1) === 0,
-        is_viewer: Number(p.player_id ?? p.id) === Number(state.playerId),
-        is_current_turn: Number(game.current_turn_player_id ?? game.next_player_id) === Number(p.player_id ?? p.id),
-        grid: blankGrid(size)
-      })).filter(p => p.player_id);
+      let status = game.status || game.game_status || 'waiting_setup';
+      if (status === 'waiting') status = 'waiting_setup';
+      if (status === 'active') status = 'playing';
+
+      const players = (game.players || []).map((p, idx) => {
+        const rawRemaining = p.ships_remaining ?? p.remaining_ships;
+        const hasRemaining = rawRemaining !== undefined && rawRemaining !== null;
+        const remaining = hasRemaining ? Number(rawRemaining) : 0;
+
+        // Important compatibility fix:
+        // Some class servers report ships_remaining: 0 before the player has placed ships.
+        // That does NOT mean eliminated during setup. Treat 0 in waiting_setup as "still placing"
+        // so the viewer board stays clickable.
+        const placed = status !== 'waiting_setup' || remaining > 0 || Boolean(p.placed || p.ships_placed || p.ready);
+        const eliminated = status !== 'waiting_setup' && placed && remaining === 0;
+
+        return {
+          player_id: Number(p.player_id ?? p.id),
+          username: p.username || p.name || `Player ${p.player_id ?? p.id}`,
+          turn_order: idx,
+          ships_remaining: remaining,
+          placed,
+          eliminated,
+          is_viewer: Number(p.player_id ?? p.id) === Number(state.playerId),
+          is_current_turn: Number(game.current_turn_player_id ?? game.next_player_id) === Number(p.player_id ?? p.id),
+          grid: blankGrid(size)
+        };
+      }).filter(p => p.player_id);
 
       const viewerInServerList = players.some(p => p.player_id === Number(state.playerId));
       if (!viewerInServerList && isLocallyJoined(game.game_id || state.gameId, state.playerId)) {
@@ -1039,9 +1056,6 @@
         target.grid[m.row][m.col] = m.result === 'hit' ? 'hit' : 'miss';
       });
 
-      let status = game.status || game.game_status || 'waiting_setup';
-      if (status === 'waiting') status = 'waiting_setup';
-      if (status === 'active') status = 'playing';
       const winner_id = game.winner_id || (status === 'finished' ? players.find(p => !p.eliminated)?.player_id : null);
       return {
         game_id: Number(game.game_id || state.gameId),
@@ -1144,7 +1158,7 @@
       $('placementPill').textContent = canPlace ? 'Place fleet' : viewerBoard?.placed ? 'Fleet submitted' : 'Locked';
       $('submitShipsBtn').disabled = !canPlace || state.plannedShips.length !== SHIPS.length;
       $('clearShipsBtn').disabled = !canPlace;
-      $('setupHelp').textContent = canPlace ? 'You need exactly three ships: length 2, length 3, and length 5.' : 'Your fleet is submitted or the game has already started.';
+      $('setupHelp').textContent = canPlace ? 'Click cells on your own board to place ships. If a class server later rejects placement, it uses a different ship format.' : 'Your fleet is submitted or the game has already started.';
     }
 
     function playerName(id) {
