@@ -665,20 +665,33 @@
       const grid_size = Number($('gridSizeInput').value);
       const max_players = Number($('maxPlayersInput').value);
       const data = await api('/api/games', { method: 'POST', body: JSON.stringify({ creator_id: state.playerId, grid_size, max_players }) });
+      markJoined(data.game_id, state.playerId);
       enterGame(data.game_id);
       toast(`Created game #${data.game_id}`);
     }
 
     async function joinGame(gameId) {
       if (!state.playerId) { showPage('auth'); return toast('Sign in before joining a game.'); }
-      await api(`/api/games/${gameId}/join`, { method: 'POST', body: JSON.stringify({ player_id: state.playerId }) });
-      enterGame(gameId);
-      toast(`Joined game #${gameId}`);
+      try {
+        await api(`/api/games/${gameId}/join`, { method: 'POST', body: JSON.stringify({ player_id: state.playerId }) });
+        markJoined(gameId, state.playerId);
+        enterGame(gameId);
+        toast(`Joined game #${gameId}`);
+      } catch (err) {
+        if (isAlreadyJoinedError(err)) {
+          markJoined(gameId, state.playerId);
+          enterGame(gameId);
+          toast(`Already in game #${gameId}.`);
+          return;
+        }
+        throw err;
+      }
     }
 
     function enterGame(gameId) {
       state.gameId = Number(gameId);
       localStorage.setItem('fc_game_id', state.gameId);
+      if (state.playerId) markJoined(state.gameId, state.playerId);
       state.plannedShips = [];
       if (state.socket) state.socket.emit('watch_game', { game_id: state.gameId });
       showPage('game');
@@ -740,6 +753,45 @@
       localStorage.setItem(`${storagePrefix()}_shots`, JSON.stringify(map || {}));
     }
 
+    function membershipKey(gameId = state.gameId, playerId = state.playerId) {
+      return `fc_member_${encodeURIComponent(state.serverUrl || DEFAULT_SERVER_URL)}_${gameId}_${playerId}`;
+    }
+
+    function markJoined(gameId = state.gameId, playerId = state.playerId) {
+      if (!gameId || !playerId) return;
+      localStorage.setItem(membershipKey(gameId, playerId), '1');
+    }
+
+    function isLocallyJoined(gameId = state.gameId, playerId = state.playerId) {
+      return !!(gameId && playerId && localStorage.getItem(membershipKey(gameId, playerId)) === '1');
+    }
+
+    function isAlreadyJoinedError(err) {
+      const msg = String(err?.message || '').toLowerCase();
+      return msg.includes('already') && (msg.includes('join') || msg.includes('game') || msg.includes('player'));
+    }
+
+    function isNotInGameError(err) {
+      const msg = String(err?.message || '').toLowerCase();
+      return (msg.includes('not') && (msg.includes('game') || msg.includes('joined') || msg.includes('participant'))) || msg.includes('not in this game');
+    }
+
+    async function ensureJoined(gameId = state.gameId) {
+      if (!state.playerId || !gameId) throw new Error('Sign in and choose a game first.');
+      if (isLocallyJoined(gameId, state.playerId)) return true;
+      try {
+        await api(`/api/games/${gameId}/join`, { method: 'POST', body: JSON.stringify({ player_id: state.playerId }) });
+        markJoined(gameId, state.playerId);
+        return true;
+      } catch (err) {
+        if (isAlreadyJoinedError(err)) {
+          markJoined(gameId, state.playerId);
+          return true;
+        }
+        throw err;
+      }
+    }
+
     function blankGrid(size, fill = 'empty') {
       return Array.from({ length: Number(size || 8) }, () => Array.from({ length: Number(size || 8) }, () => fill));
     }
@@ -796,7 +848,8 @@
         grid: blankGrid(size)
       })).filter(p => p.player_id);
 
-      if (!players.some(p => p.player_id === Number(state.playerId))) {
+      const viewerInServerList = players.some(p => p.player_id === Number(state.playerId));
+      if (!viewerInServerList && isLocallyJoined(game.game_id || state.gameId, state.playerId)) {
         players.unshift({
           player_id: Number(state.playerId),
           username: state.username || `Player ${state.playerId}`,
@@ -856,7 +909,9 @@
         your_turn: Number(game.current_turn_player_id ?? game.next_player_id) === Number(state.playerId),
         winner_id,
         moves: normalized,
-        local_only: true
+        local_only: true,
+        viewer_in_server_list: viewerInServerList,
+        membership_warning: !viewerInServerList && isLocallyJoined(game.game_id || state.gameId, state.playerId)
       };
     }
 
@@ -933,7 +988,8 @@
         <span class="pill">${data.grid_size}×${data.grid_size}</span>
         <span class="pill">${data.boards.length}/${data.max_players} players</span>
         <span class="pill">${data.your_turn ? 'Your turn' : data.current_turn_player_id ? `${playerName(data.current_turn_player_id)}'s turn` : 'Waiting for fleets'}</span>
-        ${winner ? `<span class="pill">Winner: ${winner}</span>` : ''}`;
+        ${winner ? `<span class="pill">Winner: ${winner}</span>` : ''}
+        ${data.membership_warning ? `<span class="pill">Joined locally · server did not list you</span>` : ''}`;
       renderBoards();
       renderStats();
       renderHistory();
@@ -1047,6 +1103,7 @@
     async function submitShips() {
       if (state.plannedShips.length !== SHIPS.length) return toast('Place all three ships first.');
       const planned = JSON.parse(JSON.stringify(state.plannedShips));
+      await ensureJoined(state.gameId);
       try {
         await api(`/api/games/${state.gameId}/place`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, ships: planned }) });
       } catch (enhancedErr) {
@@ -1054,7 +1111,13 @@
           await api(`/api/games/${state.gameId}/place`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, ships: officialShipCells(planned) }) });
           toast('Server accepted compatibility placement. Your full fleet will still display locally in this browser.');
         } catch (officialErr) {
-          throw new Error(officialErr.message || enhancedErr.message);
+          if (isNotInGameError(officialErr) || isNotInGameError(enhancedErr)) {
+            await ensureJoined(state.gameId);
+            await api(`/api/games/${state.gameId}/place`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, ships: officialShipCells(planned) }) });
+            toast('Re-joined game and submitted compatibility placement.');
+          } else {
+            throw new Error(officialErr.message || enhancedErr.message);
+          }
         }
       }
       saveStoredShips(planned);
@@ -1090,11 +1153,21 @@
 
     async function fireShot(target_player_id, row, col) {
       try {
+        await ensureJoined(state.gameId);
         let data;
+        const sendShot = async () => {
+          try {
+            return await api(`/api/games/${state.gameId}/fire`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, target_player_id: Number(target_player_id), row, col }) });
+          } catch (enhancedErr) {
+            return await api(`/api/games/${state.gameId}/fire`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, row, col }) });
+          }
+        };
         try {
-          data = await api(`/api/games/${state.gameId}/fire`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, target_player_id: Number(target_player_id), row, col }) });
-        } catch (enhancedErr) {
-          data = await api(`/api/games/${state.gameId}/fire`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, row, col }) });
+          data = await sendShot();
+        } catch (err) {
+          if (!isNotInGameError(err)) throw err;
+          await ensureJoined(state.gameId);
+          data = await sendShot();
         }
         applyLocalShot(target_player_id, row, col, data.result, data);
         toast(data.result === 'hit' ? 'Direct hit!' : 'Miss.');
