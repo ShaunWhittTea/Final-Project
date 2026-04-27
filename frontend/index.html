@@ -396,7 +396,7 @@
           <div class="panel lobby-card"><div class="panel-inner stack">
             <div class="section-title"><h3>All-Time Stats</h3><span class="pill">Records</span></div>
             <p class="tiny muted">View your career stats and the all-time leaderboard for the current server.</p>
-            <button class="btn-primary" id="openStatsPageBtn">Open Stats & Leaderboard</button>
+            <button type="button" class="btn-primary" id="openStatsPageBtn" onclick="openStatsPage()">Open Stats & Leaderboard</button>
           </div></div>
         </section>
 
@@ -817,8 +817,9 @@
       $('statsServerPill').textContent = serverBase();
       $('statsPlayerPill').textContent = `${state.username || 'Player'} #${state.playerId}`;
       showPage('stats');
-      refreshLeaderboard();
+      refreshLeaderboard().catch(err => toast(err.message));
     }
+    window.openStatsPage = openStatsPage;
 
     function setSession(data) {
       state.playerId = Number(data.player_id ?? data.id ?? data.playerId ?? data.player?.player_id ?? data.data?.player_id);
@@ -1560,7 +1561,10 @@
     $('loginPlayerBtn').onclick = () => loginPlayer().catch(err => toast(err.message));
     $('createGameBtn').onclick = () => createGame().catch(err => toast(err.message));
     $('refreshGamesBtn').onclick = refreshOpenGames;
-    $('openStatsPageBtn').onclick = openStatsPage;
+    $('openStatsPageBtn').onclick = event => {
+      event.preventDefault();
+      openStatsPage();
+    };
     $('backToLobbyFromStatsBtn').onclick = () => { showPage('lobby'); refreshOpenGames(); };
     $('refreshLeaderboardBtn').onclick = () => refreshLeaderboard();
     $('joinByIdBtn').onclick = () => { const id = Number($('joinGameIdInput').value); id ? joinGame(id).catch(err => toast(err.message)) : toast('Enter a valid game ID.'); };
