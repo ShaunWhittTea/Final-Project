@@ -644,13 +644,18 @@
       let data;
       try {
         data = await api('/api/players/login', { method: 'POST', body: JSON.stringify({ username }) });
-      } catch (err) {
-        const list = await api('/api/players');
-        const players = list.players || [];
-        const found = players.find(p => String(p.username || '').toLowerCase() === username.toLowerCase());
-        if (!found) throw new Error('That username was not found on this server.');
-        data = { player_id: found.player_id, username: found.username };
+      } catch (loginErr) {
+        try {
+          data = await api('/api/players', { method: 'POST', body: JSON.stringify({ username }) });
+        } catch (reuseErr) {
+          const list = await api('/api/players');
+          const players = list.players || [];
+          const found = players.find(p => String(p.username || '').toLowerCase() === username.toLowerCase());
+          if (!found) throw new Error('That username was not found on this server.');
+          data = { player_id: found.player_id, username: found.username };
+        }
       }
+      data.username = data.username || username;
       setSession(data);
       toast(`Signed in as ${state.username}.`);
     }
@@ -713,132 +718,181 @@
       } catch (err) { list.innerHTML = `<div class="tiny muted">Could not load games: ${err.message}</div>`; }
     }
 
+    function storagePrefix() {
+      return `fc_local_${encodeURIComponent(state.serverUrl || DEFAULT_SERVER_URL)}_${state.gameId}_${state.playerId}`;
+    }
+
+    function getStoredShips() {
+      try { return JSON.parse(localStorage.getItem(`${storagePrefix()}_ships`) || '[]'); }
+      catch (_) { return []; }
+    }
+
+    function saveStoredShips(ships) {
+      localStorage.setItem(`${storagePrefix()}_ships`, JSON.stringify(ships || []));
+    }
+
+    function getStoredShotMap() {
+      try { return JSON.parse(localStorage.getItem(`${storagePrefix()}_shots`) || '{}'); }
+      catch (_) { return {}; }
+    }
+
+    function saveStoredShotMap(map) {
+      localStorage.setItem(`${storagePrefix()}_shots`, JSON.stringify(map || {}));
+    }
+
+    function blankGrid(size, fill = 'empty') {
+      return Array.from({ length: Number(size || 8) }, () => Array.from({ length: Number(size || 8) }, () => fill));
+    }
+
+    function flattenPlannedShips(ships) {
+      const coords = [];
+      (ships || []).forEach(ship => (ship.coordinates || []).forEach(([row, col]) => coords.push({ row, col })));
+      return coords;
+    }
+
+    function officialShipCells(ships) {
+      return (ships || []).map(ship => {
+        const first = ship.coordinates?.[0] || [0, 0];
+        return { row: first[0], col: first[1] };
+      }).slice(0, 3);
+    }
+
+    function moveArray(raw) {
+      if (Array.isArray(raw)) return raw;
+      if (Array.isArray(raw?.moves)) return raw.moves;
+      if (Array.isArray(raw?.data)) return raw.data;
+      return [];
+    }
+
+    function normalizeMove(move, players) {
+      const shooter = Number(move.player_id ?? move.shooter_id ?? move.attacker_id);
+      let target = Number(move.target_player_id ?? move.target_id ?? move.defender_id ?? move.opponent_id);
+      if (!target && players?.length === 2) {
+        const other = players.find(p => Number(p.player_id) !== shooter);
+        target = other ? Number(other.player_id) : null;
+      }
+      return {
+        move_number: Number(move.move_number ?? move.id ?? move.turn_number ?? 0),
+        player_id: shooter,
+        target_player_id: target || null,
+        row: Number(move.row),
+        col: Number(move.col),
+        result: String(move.result || '').toLowerCase(),
+        timestamp: move.timestamp || move.created_at || null
+      };
+    }
+
+    function buildLocalBoards(game, rawMoves) {
+      const size = Number(game.grid_size || game.size || 8);
+      const players = (game.players || []).map((p, idx) => ({
+        player_id: Number(p.player_id ?? p.id),
+        username: p.username || p.name || `Player ${p.player_id ?? p.id}`,
+        turn_order: idx,
+        ships_remaining: Number(p.ships_remaining ?? p.remaining_ships ?? 0),
+        placed: Number(p.ships_remaining ?? p.remaining_ships ?? -1) >= 0,
+        eliminated: Number(p.ships_remaining ?? p.remaining_ships ?? 1) === 0,
+        is_viewer: Number(p.player_id ?? p.id) === Number(state.playerId),
+        is_current_turn: Number(game.current_turn_player_id ?? game.next_player_id) === Number(p.player_id ?? p.id),
+        grid: blankGrid(size)
+      })).filter(p => p.player_id);
+
+      if (!players.some(p => p.player_id === Number(state.playerId))) {
+        players.unshift({
+          player_id: Number(state.playerId),
+          username: state.username || `Player ${state.playerId}`,
+          turn_order: 0,
+          ships_remaining: 0,
+          placed: false,
+          eliminated: false,
+          is_viewer: true,
+          is_current_turn: Number(game.current_turn_player_id) === Number(state.playerId),
+          grid: blankGrid(size)
+        });
+      }
+
+      const viewer = players.find(p => p.is_viewer);
+      const storedShips = getStoredShips();
+      if (viewer && storedShips.length) {
+        viewer.placed = true;
+        const shipCells = flattenPlannedShips(storedShips);
+        shipCells.forEach(({ row, col }) => {
+          if (viewer.grid[row]?.[col] !== undefined) viewer.grid[row][col] = 'ship';
+        });
+        if (!viewer.ships_remaining) viewer.ships_remaining = shipCells.length;
+      }
+
+      const localShots = getStoredShotMap();
+      const normalized = moveArray(rawMoves).map(m => normalizeMove(m, players)).filter(m => Number.isFinite(m.row) && Number.isFinite(m.col));
+      normalized.forEach(m => {
+        const key = `${m.player_id}:${m.row}:${m.col}`;
+        if (!m.target_player_id && localShots[key]?.target_player_id) m.target_player_id = Number(localShots[key].target_player_id);
+        if (!m.result && localShots[key]?.result) m.result = localShots[key].result;
+      });
+      Object.values(localShots).forEach(local => {
+        if (!normalized.some(m => Number(m.player_id) === Number(local.player_id) && Number(m.row) === Number(local.row) && Number(m.col) === Number(local.col))) {
+          normalized.push(local);
+        }
+      });
+      normalized.sort((a, b) => Number(a.move_number || 0) - Number(b.move_number || 0));
+
+      normalized.forEach(m => {
+        const target = players.find(p => Number(p.player_id) === Number(m.target_player_id));
+        if (!target || !target.grid[m.row]) return;
+        target.grid[m.row][m.col] = m.result === 'hit' ? 'hit' : 'miss';
+      });
+
+      let status = game.status || game.game_status || 'waiting_setup';
+      if (status === 'waiting') status = 'waiting_setup';
+      if (status === 'active') status = 'playing';
+      const winner_id = game.winner_id || (status === 'finished' ? players.find(p => !p.eliminated)?.player_id : null);
+      return {
+        game_id: Number(game.game_id || state.gameId),
+        grid_size: size,
+        status,
+        boards: players,
+        players,
+        max_players: Number(game.max_players || players.length || 2),
+        current_turn_player_id: game.current_turn_player_id ?? game.next_player_id ?? null,
+        your_turn: Number(game.current_turn_player_id ?? game.next_player_id) === Number(state.playerId),
+        winner_id,
+        moves: normalized,
+        local_only: true
+      };
+    }
+
+    async function getGameAndMovesFallback() {
+      const [game, rawMoves] = await Promise.all([
+        api(`/api/games/${state.gameId}`),
+        api(`/api/games/${state.gameId}/moves`).catch(() => [])
+      ]);
+      return buildLocalBoards(game, rawMoves);
+    }
+
     async function refreshGame(noToast) {
       if (!state.gameId || !state.playerId) return;
       try {
-        let boards;
-        let moves = { moves: [] };
-        try {
-          [boards, moves] = await Promise.all([
-            api(`/api/games/${state.gameId}/boards?viewer_player_id=${state.playerId}`),
-            api(`/api/games/${state.gameId}/moves`).catch(() => ({ moves: [] }))
-          ]);
-        } catch (primaryErr) {
-          boards = await loadGameCompat(primaryErr);
-        }
+        const [boards, moves] = await Promise.all([
+          api(`/api/games/${state.gameId}/boards?viewer_player_id=${state.playerId}`),
+          api(`/api/games/${state.gameId}/moves`).catch(() => [])
+        ]);
         state.boards = boards;
-        state.moves = moves.moves || [];
+        state.moves = moveArray(moves);
         renderGame();
       } catch (err) {
-        if (!noToast) toast(err.message);
-        if (!state.boards && $('boardsArea')) {
-          $('gameTitle').textContent = `Battle Room #${state.gameId}`;
-          $('boardsArea').innerHTML = `<div class="board-card"><h2>Could not load this game</h2><p class="muted">${err.message}</p><p class="tiny muted">This server is reachable, but it does not appear to expose the board endpoint format this frontend needs. Create/join worked, but loading the actual boards failed.</p><p class="tiny muted">Needed: <code>/api/games/${state.gameId}/boards?viewer_player_id=${state.playerId}</code>, or a compatible board endpoint.</p></div>`;
+        try {
+          const localBoards = await getGameAndMovesFallback();
+          state.boards = localBoards;
+          state.moves = localBoards.moves || [];
+          renderGame();
+          if (!noToast) toast('Using local board tracking for this server.');
+        } catch (fallbackErr) {
+          if (!noToast) toast(fallbackErr.message || err.message);
+          if (!state.boards && $('boardsArea')) {
+            $('gameTitle').textContent = `Battle Room #${state.gameId}`;
+            $('boardsArea').innerHTML = `<div class="board-card"><h2>Could not load this game</h2><p class="muted">${fallbackErr.message || err.message}</p><p class="tiny muted">This server must support the official game endpoints: GET /api/games/{id}, POST /api/games/{id}/fire, and GET /api/games/{id}/moves.</p></div>`;
+          }
         }
       }
-    }
-
-    async function loadGameCompat(primaryErr) {
-      const game = await api(`/api/games/${state.gameId}`).catch(() => null);
-      if (!game) throw primaryErr;
-
-      const players = normalizePlayers(game.players || game.game_players || game.participants || []);
-      if (!players.length) {
-        throw new Error(`Game #${state.gameId} exists, but this server did not return a player list in /api/games/${state.gameId}.`);
-      }
-
-      const gridSize = Number(game.grid_size || game.gridSize || game.size || 8);
-      const boards = [];
-      let loadedAnyBoard = false;
-
-      for (const player of players) {
-        const rawBoard = await tryBoardEndpoints(player.player_id);
-        if (rawBoard) loadedAnyBoard = true;
-        boards.push(makeCompatBoard(player, rawBoard, gridSize, game));
-      }
-
-      if (!loadedAnyBoard) {
-        throw new Error(`Game #${state.gameId} exists, but this server does not provide a compatible board-view endpoint. It returned 404 for our /boards request, so the frontend cannot draw the battle grid.`);
-      }
-
-      return {
-        game_id: Number(game.game_id || game.id || state.gameId),
-        grid_size: gridSize,
-        max_players: Number(game.max_players || game.maxPlayers || players.length || 2),
-        status: game.status || game.game_status || 'waiting_setup',
-        current_turn_player_id: game.current_turn_player_id || game.currentPlayerId || game.current_player_id || null,
-        your_turn: Number(game.current_turn_player_id || game.currentPlayerId || game.current_player_id) === Number(state.playerId),
-        winner_id: game.winner_id || game.winnerId || null,
-        boards
-      };
-    }
-
-    function normalizePlayers(players) {
-      return players.map((p, index) => ({
-        player_id: Number(p.player_id || p.playerId || p.id),
-        username: p.username || p.name || p.display_name || `Player ${p.player_id || p.playerId || p.id}`,
-        turn_order: Number(p.turn_order ?? p.turnOrder ?? index),
-        placed: Boolean(p.placed ?? p.ships_placed ?? p.has_placed_ships ?? p.ready ?? false),
-        eliminated: Boolean(p.eliminated ?? false)
-      })).filter(p => Number.isFinite(p.player_id));
-    }
-
-    async function tryBoardEndpoints(playerId) {
-      const candidates = [
-        `/api/test/games/${state.gameId}/board/${playerId}`,
-        `/api/test/games/${state.gameId}/board?player_id=${playerId}`,
-        `/test/games/${state.gameId}/board/${playerId}`,
-        `/test/games/${state.gameId}/board?player_id=${playerId}`,
-        `/api/games/${state.gameId}/board/${playerId}`,
-        `/api/games/${state.gameId}/board?player_id=${playerId}`,
-        `/api/games/${state.gameId}/players/${playerId}/board`
-      ];
-      for (const path of candidates) {
-        try { return await api(path); } catch (_) {}
-      }
-      return null;
-    }
-
-    function makeCompatBoard(player, raw, size, game) {
-      const grid = normalizeGrid(raw?.grid || raw?.board || raw?.cells, size, Number(player.player_id) === Number(state.playerId));
-      const ships = raw?.ships || raw?.ship_cells || [];
-      const hits = raw?.hits || [];
-      const misses = raw?.misses || [];
-      for (const [r, c] of hits) if (grid[r] && grid[r][c] !== undefined) grid[r][c] = 'hit';
-      for (const [r, c] of misses) if (grid[r] && grid[r][c] !== undefined) grid[r][c] = 'miss';
-      const shipCells = countCells(grid, 'ship') + countCells(grid, 'hit') + countCells(grid, 'sunk');
-      const hitCells = countCells(grid, 'hit') + countCells(grid, 'sunk');
-      const placed = player.placed || shipCells > 0 || ships.length > 0 || ['playing', 'finished'].includes(game.status);
-      return {
-        player_id: player.player_id,
-        username: player.username,
-        turn_order: player.turn_order,
-        is_viewer: Number(player.player_id) === Number(state.playerId),
-        is_current_turn: Number(game.current_turn_player_id || game.currentPlayerId || game.current_player_id) === Number(player.player_id),
-        placed,
-        eliminated: placed && shipCells > 0 && hitCells >= shipCells,
-        ships_remaining: Math.max(0, shipCells - hitCells),
-        grid
-      };
-    }
-
-    function normalizeGrid(rawGrid, size, isViewer) {
-      const grid = Array.from({ length: size }, () => Array.from({ length: size }, () => 'empty'));
-      if (!rawGrid) return grid;
-      for (let r = 0; r < Math.min(size, rawGrid.length); r++) {
-        for (let c = 0; c < Math.min(size, rawGrid[r].length); c++) {
-          const value = String(rawGrid[r][c] ?? '').toLowerCase();
-          if (['hit', 'h', 'x', 'sunk'].includes(value)) grid[r][c] = value === 'sunk' ? 'sunk' : 'hit';
-          else if (['miss', 'm', 'o', '*'].includes(value)) grid[r][c] = 'miss';
-          else if (['ship', 's', 'occupied', 'boat'].includes(value)) grid[r][c] = isViewer ? 'ship' : 'empty';
-          else grid[r][c] = 'empty';
-        }
-      }
-      return grid;
-    }
-
-    function countCells(grid, kind) {
-      return grid.reduce((total, row) => total + row.filter(cell => cell === kind).length, 0);
     }
 
     function showResultModal(kind, winnerName) {
@@ -992,7 +1046,18 @@
 
     async function submitShips() {
       if (state.plannedShips.length !== SHIPS.length) return toast('Place all three ships first.');
-      await api(`/api/games/${state.gameId}/place`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, ships: state.plannedShips }) });
+      const planned = JSON.parse(JSON.stringify(state.plannedShips));
+      try {
+        await api(`/api/games/${state.gameId}/place`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, ships: planned }) });
+      } catch (enhancedErr) {
+        try {
+          await api(`/api/games/${state.gameId}/place`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, ships: officialShipCells(planned) }) });
+          toast('Server accepted compatibility placement. Your full fleet will still display locally in this browser.');
+        } catch (officialErr) {
+          throw new Error(officialErr.message || enhancedErr.message);
+        }
+      }
+      saveStoredShips(planned);
       toast('Fleet submitted. Waiting for opponents.');
       state.plannedShips = [];
       refreshGame(true);
@@ -1002,24 +1067,35 @@
       if (!state.boards) return;
       const target = state.boards.boards.find(b => Number(b.player_id) === Number(target_player_id));
       if (target && target.grid?.[row]) {
-        target.grid[row][col] = result === 'hit' ? 'sunk' : 'miss';
+        target.grid[row][col] = result === 'hit' ? 'hit' : 'miss';
         if (result === 'hit') target.ships_remaining = Math.max(0, Number(target.ships_remaining || 0) - 1);
       }
 
       const nextPlayerId = response?.next_player_id || null;
       state.boards.your_turn = Number(nextPlayerId) === Number(state.playerId);
       state.boards.current_turn_player_id = nextPlayerId;
-      if (response?.game_status) state.boards.status = response.game_status;
+      if (response?.game_status) {
+        state.boards.status = response.game_status === 'active' ? 'playing' : response.game_status;
+      }
       if (response?.winner_id) state.boards.winner_id = response.winner_id;
 
       const moveNumber = state.moves.length ? Math.max(...state.moves.map(m => Number(m.move_number || 0))) + 1 : 1;
-      state.moves.push({ move_number: moveNumber, player_id: state.playerId, target_player_id: Number(target_player_id), row, col, result });
+      const localMove = { move_number: moveNumber, player_id: state.playerId, target_player_id: Number(target_player_id), row, col, result };
+      state.moves.push(localMove);
+      const shotMap = getStoredShotMap();
+      shotMap[`${state.playerId}:${row}:${col}`] = localMove;
+      saveStoredShotMap(shotMap);
       renderGame();
     }
 
     async function fireShot(target_player_id, row, col) {
       try {
-        const data = await api(`/api/games/${state.gameId}/fire`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, target_player_id: Number(target_player_id), row, col }) });
+        let data;
+        try {
+          data = await api(`/api/games/${state.gameId}/fire`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, target_player_id: Number(target_player_id), row, col }) });
+        } catch (enhancedErr) {
+          data = await api(`/api/games/${state.gameId}/fire`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, row, col }) });
+        }
         applyLocalShot(target_player_id, row, col, data.result, data);
         toast(data.result === 'hit' ? 'Direct hit!' : 'Miss.');
         setTimeout(() => refreshGame(true), 450);
