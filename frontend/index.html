@@ -468,6 +468,7 @@
       activeShip: 'patrol',
       orientation: 'horizontal',
       socket: null,
+      socketLive: false,
       refreshTimer: null,
       lastResultModalKey: null,
       serverUrl: localStorage.getItem('fc_server_url') || DEFAULT_SERVER_URL
@@ -501,8 +502,28 @@
       }
     }
 
+    function clearLocalSessionForServerChange() {
+      if (state.socket && state.gameId) state.socket.emit('leave_game', { game_id: state.gameId });
+      state.playerId = null;
+      state.username = '';
+      state.gameId = null;
+      state.boards = null;
+      state.moves = [];
+      state.plannedShips = [];
+      state.lastResultModalKey = null;
+      localStorage.removeItem('fc_player_id');
+      localStorage.removeItem('fc_username');
+      localStorage.removeItem('fc_game_id');
+      hideResultModal();
+      updateBadges();
+      showPage('auth');
+    }
+
     function saveServer() {
-      state.serverUrl = normalizeServerUrl($('serverUrlInput').value) || DEFAULT_SERVER_URL;
+      const nextServerUrl = normalizeServerUrl($('serverUrlInput').value) || DEFAULT_SERVER_URL;
+      const changed = nextServerUrl !== state.serverUrl;
+      if (changed) clearLocalSessionForServerChange();
+      state.serverUrl = nextServerUrl;
       localStorage.setItem('fc_server_url', state.serverUrl);
       if (state.socket) {
         state.socket.disconnect();
@@ -510,7 +531,7 @@
       }
       setupSocket();
       updateServerUi();
-      toast(`Using ${state.serverUrl}`);
+      toast(changed ? `Using ${state.serverUrl}. Please sign in on this server.` : `Using ${state.serverUrl}`);
     }
 
     async function api(path, options = {}) {
@@ -574,21 +595,39 @@
     }
 
     function setupSocket() {
+      state.socketLive = false;
       if (!window.io) {
-        $('socketStatus').textContent = '● Offline fallback';
+        $('socketStatus').textContent = '● REST sync';
         return;
       }
       if (state.socket) state.socket.disconnect();
-      state.socket = io(state.serverUrl || DEFAULT_SERVER_URL, { transports: ['websocket', 'polling'] });
+      $('socketStatus').textContent = '● Connecting';
+      state.socket = io(state.serverUrl || DEFAULT_SERVER_URL, {
+        transports: ['websocket', 'polling'],
+        timeout: 1800,
+        reconnectionAttempts: 2
+      });
       state.socket.on('connect', () => {
+        state.socketLive = true;
         $('socketStatus').textContent = '● Live';
         if (state.gameId) state.socket.emit('watch_game', { game_id: state.gameId });
       });
-      state.socket.on('disconnect', () => $('socketStatus').textContent = '● Reconnecting');
+      state.socket.on('connect_error', () => {
+        state.socketLive = false;
+        $('socketStatus').textContent = '● REST sync';
+      });
+      state.socket.on('disconnect', () => {
+        state.socketLive = false;
+        $('socketStatus').textContent = '● REST sync';
+      });
       state.socket.on('game_changed', data => {
         if (Number(data.game_id) === Number(state.gameId)) refreshGame(false);
       });
       state.socket.on('open_games_changed', refreshOpenGames);
+
+      setTimeout(() => {
+        if (!state.socketLive) $('socketStatus').textContent = '● REST sync';
+      }, 2200);
     }
 
     async function createPlayer() {
@@ -686,6 +725,10 @@
         renderGame();
       } catch (err) {
         if (!noToast) toast(err.message);
+        if (!state.boards && $('boardsArea')) {
+          $('gameTitle').textContent = `Battle Room #${state.gameId}`;
+          $('boardsArea').innerHTML = `<div class="board-card"><h2>Could not load this game</h2><p class="muted">${err.message}</p><p class="tiny muted">If you switched to another team’s server, sign in on that server and join/create a game there. Their server may not support WebSockets, so the app will use REST sync instead.</p></div>`;
+        }
       }
     }
 
@@ -926,7 +969,11 @@
     } else {
       showPage('auth');
     }
-    state.refreshTimer = setInterval(() => { if (state.playerId) refreshOpenGames(); if (state.gameId) refreshGame(true); }, 12000);
+    state.refreshTimer = setInterval(() => {
+      if (state.playerId && !state.gameId) refreshOpenGames();
+      if (state.gameId && !state.socketLive) refreshGame(true);
+    }, 2500);
+    setInterval(() => { if (state.playerId && !state.gameId) refreshOpenGames(); }, 12000);
   </script>
 </body>
 </html>
