@@ -545,6 +545,47 @@
       return data;
     }
 
+    function extractGameId(data) {
+      return Number(
+        data?.game_id ??
+        data?.id ??
+        data?.gameId ??
+        data?.game?.game_id ??
+        data?.game?.id ??
+        data?.data?.game_id ??
+        data?.data?.id
+      );
+    }
+
+    function asArrayOfGames(data) {
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.games)) return data.games;
+      if (Array.isArray(data?.open_games)) return data.open_games;
+      if (Array.isArray(data?.data)) return data.data;
+      if (Array.isArray(data?.results)) return data.results;
+      return [];
+    }
+
+    function normalizeLobbyGame(raw) {
+      const game_id = Number(raw?.game_id ?? raw?.id ?? raw?.gameId);
+      const grid_size = Number(raw?.grid_size ?? raw?.size ?? raw?.board_size ?? raw?.gridSize ?? 8);
+      const max_players = Number(raw?.max_players ?? raw?.players_max ?? raw?.maxPlayers ?? raw?.capacity ?? 2);
+      let player_count = Number(
+        raw?.active_players ??
+        raw?.current_players ??
+        raw?.player_count ??
+        raw?.players_joined ??
+        raw?.num_players ??
+        (Array.isArray(raw?.players) ? raw.players.length : 0)
+      );
+      if (!Number.isFinite(player_count)) player_count = 0;
+      const creatorId = Number(raw?.creator_id ?? raw?.owner_id ?? raw?.host_player_id);
+      const locallyJoined = isLocallyJoined(game_id, state.playerId) || game_id === Number(state.gameId) || creatorId === Number(state.playerId);
+      if (locallyJoined) player_count = Math.max(player_count, 1);
+      const status = String(raw?.status ?? raw?.state ?? raw?.game_status ?? 'open').replace('waiting_setup', 'open');
+      return { game_id, grid_size, max_players, player_count, status, locallyJoined };
+    }
+
     function setTheme(theme) {
       document.documentElement.dataset.theme = theme;
       localStorage.setItem('fc_theme', theme);
@@ -565,8 +606,8 @@
     }
 
     function setSession(data) {
-      state.playerId = Number(data.player_id);
-      state.username = data.username || data.displayName || '';
+      state.playerId = Number(data.player_id ?? data.id ?? data.playerId ?? data.player?.player_id ?? data.data?.player_id);
+      state.username = data.username || data.displayName || data.name || '';
       state.gameId = null;
       localStorage.setItem('fc_player_id', state.playerId);
       localStorage.setItem('fc_username', state.username);
@@ -665,9 +706,26 @@
       const grid_size = Number($('gridSizeInput').value);
       const max_players = Number($('maxPlayersInput').value);
       const data = await api('/api/games', { method: 'POST', body: JSON.stringify({ creator_id: state.playerId, grid_size, max_players }) });
-      markJoined(data.game_id, state.playerId);
-      enterGame(data.game_id);
-      toast(`Created game #${data.game_id}`);
+      const gameId = extractGameId(data);
+      if (!gameId) throw new Error('Game was created, but this server did not return a usable game_id.');
+
+      // Official spec says the creator should be auto-added, but some class servers
+      // do not actually add the creator. Do a real server-side join anyway so the
+      // player is definitely in GamePlayers on that server. Only treat "already
+      // joined" as success; do not rely on local-only membership.
+      try {
+        await api(`/api/games/${gameId}/join`, { method: 'POST', body: JSON.stringify({ player_id: state.playerId }) });
+      } catch (err) {
+        if (!isAlreadyJoinedError(err)) {
+          throw new Error(`Game #${gameId} was created, but the server did not add you to it: ${err.message}`);
+        }
+      }
+
+      markJoined(gameId, state.playerId);
+      state.gameId = gameId;
+      localStorage.setItem('fc_game_id', gameId);
+      toast(`Created and joined game #${gameId}.`);
+      enterGame(gameId);
     }
 
     async function joinGame(gameId) {
@@ -717,17 +775,22 @@
       const list = $('openGamesList');
       try {
         const data = await api('/api/games');
-        const games = data.games || [];
+        const games = asArrayOfGames(data).map(normalizeLobbyGame).filter(g => g.game_id);
         if (!games.length) {
           list.innerHTML = '<div class="tiny muted">No open games yet. Create one to start a lobby.</div>';
           return;
         }
-        list.innerHTML = games.map(g => `
-          <div class="game-card">
-            <div><strong>Game #${g.game_id}</strong><div class="tiny muted">${g.active_players}/${g.max_players} players · ${g.grid_size}×${g.grid_size}</div></div>
-            <button class="btn-small" data-join="${g.game_id}">Join</button>
-          </div>`).join('');
+        list.innerHTML = games.map(g => {
+          const joined = g.locallyJoined;
+          const statusText = g.status === 'open' || g.status === 'waiting' ? 'OPEN' : g.status.toUpperCase();
+          return `
+          <div class="game-card ${joined ? 'viewer' : ''}">
+            <div><strong>Game #${g.game_id}</strong><div class="tiny muted">GRID <b>${g.grid_size}×${g.grid_size}</b> &nbsp; PLAYERS <b>${g.player_count}/${g.max_players}</b>${joined ? ' &nbsp; · &nbsp; You are in this game' : ''}</div></div>
+            <div style="display:flex;align-items:center;gap:12px;"><span class="pill">${statusText}</span><button class="btn-small" data-${joined ? 'enter' : 'join'}="${g.game_id}">${joined ? 'Enter' : 'Join'}</button></div>
+          </div>`;
+        }).join('');
         list.querySelectorAll('[data-join]').forEach(btn => btn.onclick = () => joinGame(btn.dataset.join));
+        list.querySelectorAll('[data-enter]').forEach(btn => btn.onclick = () => enterGame(btn.dataset.enter));
       } catch (err) { list.innerHTML = `<div class="tiny muted">Could not load games: ${err.message}</div>`; }
     }
 
