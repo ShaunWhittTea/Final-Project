@@ -288,8 +288,8 @@
 
     .auth-card h3, .lobby-card h3 { font-size: 23px; }
     .auth-actions { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .auth-note { padding: 13px 15px; border-radius: 18px; border: 1px solid var(--line); background: rgba(255,255,255,.055); color: var(--muted); font-weight: 650; line-height: 1.45; }
-    .server-card input { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .auth-note { padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 12px; line-height: 1.45; font-weight: 650; }
+    .server-card input, .server-card select { width:100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
     .server-current { word-break: break-all; }
     .lobby-grid { display:grid; grid-template-columns: .9fr 1.1fr; gap:16px; align-items:start; }
     .welcome-panel { padding: 28px; }
@@ -342,6 +342,9 @@
         <section class="stack">
           <div class="panel auth-card server-card"><div class="panel-inner stack">
             <div class="section-title"><h3>Server</h3><span class="pill">Connect to a class server</span></div>
+            <select id="serverPresetSelect" aria-label="Class server dropdown">
+              <option value="">Choose a class server...</option>
+            </select>
             <input id="serverUrlInput" placeholder="https://final-project-m5u7.onrender.com" />
             <button id="saveServerBtn">Use Server</button>
             <div class="tiny muted server-current" id="serverCurrentText">Using this app server.</div>
@@ -451,6 +454,26 @@
 
   <script>
     const DEFAULT_SERVER_URL = 'https://final-project-m5u7.onrender.com';
+    const CLASS_SERVERS = [
+      { section:'Tuesday', code:'0x08', names:'Johan Zapata & Nathan Kitchens', url:'https://p01--frontend--zm8jxh5c8bph.code.run' },
+      { section:'Tuesday', code:'0x10', names:'Seth Stamper & Justin Hooker', url:'https://projectwarship.netlify.app' },
+      { section:'Tuesday', code:'0x07', names:'Jennifer Johnson & Owen Schuyler', url:'https://persistent-waters.onrender.com' },
+      { section:'Tuesday', code:'0x0A', names:'Gabriella Borjas & Anabel Thompson', url:'https://battleship-1-qpm6.onrender.com' },
+      { section:'Tuesday', code:'0x0C', names:'Roman Pasqualone & Aryan Kapoor', url:'https://battleship-advanced.onrender.com' },
+      { section:'Tuesday', code:'0x01', names:'Max Koon & Parker Estes', url:'https://battleship.koon.us' },
+      { section:'Tuesday', code:'0x06', names:'Jude Slade & Alex Lake', url:'https://three750final-1.onrender.com' },
+      { section:'Tuesday', code:'0x11', names:'Jade Ashley & Ayden Sabol', url:'https://battleship-cpsc3750.onrender.com' },
+      { section:'Tuesday', code:'0x04', names:'Evan Racz & Truc Le', url:'https://webdevgroupproj.onrender.com' },
+      { section:'Thursday', code:'0x0E', names:'Jack Huber & Andrew Hwang', url:'https://cpsc3750-battleshipproject.onrender.com' },
+      { section:'Thursday', code:'0x0B', names:'Bryce Dickson & James Kluttz', url:'https://cpsc.loosesocket.com' },
+      { section:'Thursday', code:'0x09', names:'Taylor Carter & Kevin Murphy', url:'https://lightslategray-dogfish-869967.hostingersite.com' },
+      { section:'Thursday', code:'0x05', names:'Mason Price & Shihab Abdelharim', url:'https://cpsc3750phase2.onrender.com/client.html' },
+      { section:'Thursday', code:'0x0D', names:'Pascual Sebastian & Tian Xue', url:'https://vibe-hunter.com/battleship' },
+      { section:'Thursday', code:'0x02', names:'Mir Patel & St Angelo Davis', url:'https://battlefieldgame.netlify.app' },
+      { section:'Thursday', code:'0x03', names:'Anthony Martino & Ian Sincoff', url:'https://finalproject3750.onrender.com' },
+      { section:'Thursday', code:'0x0F', names:'Christian Johnston & Anthony Frialde', url:'https://cpsc-3750-battleship-final-project-phase2-3zol.onrender.com' },
+      { section:'Thursday', code:'0x12', names:'Shaun Whitt & Jack Stivers', url:'https://final-project-m5u7.onrender.com' }
+    ];
 
     const SHIPS = [
       { type: 'patrol', name: 'Patrol Boat', size: 2 },
@@ -488,18 +511,44 @@
       let url = (value || '').trim();
       if (!url) return '';
       if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
-      return url.replace(/\/+$/, '');
+      url = url.replace(/\/+$/, '');
+      url = url.replace(/\/client\.html$/i, '');
+      return url;
     }
 
     function apiUrl(path) {
       return `${state.serverUrl || DEFAULT_SERVER_URL}${path}`;
     }
 
+    function populateServerDropdown() {
+      const select = $('serverPresetSelect');
+      if (!select) return;
+      const groups = CLASS_SERVERS.reduce((acc, item) => {
+        (acc[item.section] ||= []).push(item);
+        return acc;
+      }, {});
+      select.innerHTML = '<option value="">Choose a class server...</option>';
+      for (const [section, items] of Object.entries(groups)) {
+        const group = document.createElement('optgroup');
+        group.label = `${section} Section`;
+        for (const item of items) {
+          const option = document.createElement('option');
+          option.value = item.url;
+          option.textContent = `${item.code} — ${item.names}`;
+          group.appendChild(option);
+        }
+        select.appendChild(group);
+      }
+      select.onchange = () => { if (select.value) $('serverUrlInput').value = select.value; };
+    }
+
     function updateServerUi() {
       if ($('serverUrlInput')) $('serverUrlInput').value = state.serverUrl;
-      if ($('serverCurrentText')) {
-        $('serverCurrentText').textContent = `Using server: ${state.serverUrl || DEFAULT_SERVER_URL}`;
+      if ($('serverPresetSelect')) {
+        const match = CLASS_SERVERS.find(item => normalizeServerUrl(item.url) === normalizeServerUrl(state.serverUrl));
+        $('serverPresetSelect').value = match ? match.url : '';
       }
+      if ($('serverCurrentText')) $('serverCurrentText').textContent = `Using server: ${state.serverUrl || DEFAULT_SERVER_URL}`;
     }
 
     function clearLocalSessionForServerChange() {
@@ -535,13 +584,25 @@
     }
 
     async function api(path, options = {}) {
-      const res = await fetch(apiUrl(path), {
-        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-        ...options
-      });
+      let res;
+      try {
+        res = await fetch(apiUrl(path), {
+          headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+          ...options
+        });
+      } catch (err) {
+        throw new Error('Could not reach this server. This is usually a CORS issue, the server is asleep/down, or the selected client URL is not the same as the API base URL.');
+      }
       let data = {};
       try { data = await res.json(); } catch (_) {}
-      if (!res.ok) throw new Error(data.message || data.error || `Request failed (${res.status})`);
+      if (!res.ok) {
+        const msg = data.message || data.error || `Request failed (${res.status})`;
+        const error = new Error(res.status === 404 ? `${msg}. This server API may not match the expected Battleship endpoints.` : msg);
+        error.status = res.status;
+        error.data = data;
+        error.path = path;
+        throw error;
+      }
       return data;
     }
 
@@ -837,6 +898,27 @@
     function isNotInGameError(err) {
       const msg = String(err?.message || '').toLowerCase();
       return (msg.includes('not') && (msg.includes('game') || msg.includes('joined') || msg.includes('participant'))) || msg.includes('not in this game');
+    }
+
+    function isApiMismatchError(err) {
+      return err?.status === 404 || /api.*match|endpoint|not found|does not exist/i.test(err?.message || '');
+    }
+
+    function isCorsOrFetchError(err) {
+      return /cors|could not reach|failed to fetch|server is asleep|down/i.test(err?.message || '');
+    }
+
+    function shipPlacementHelpMessage(err) {
+      const msg = err?.message || '';
+      if (err?.status === 409 || /already.*placed|conflict/i.test(msg)) {
+        return 'Ship placement conflict: this server says your ships are already locked in for this game. Create a new game or use test restart if you need to place again.';
+      }
+      if (err?.status === 400 || err?.status === 403 || /ship|place|coordinate|overlap|setup|invalid|single-cell|single cell|bounds/i.test(msg)) {
+        return 'Ship placement incompatibility: this server rejected the fleet format. It may only accept the official Phase 1 placement format of three single-cell ship coordinates, or it may require setup rules different from this client.';
+      }
+      if (isApiMismatchError(err)) return 'Ship placement incompatibility: this server does not expose the expected POST /api/games/{id}/place endpoint.';
+      if (isCorsOrFetchError(err)) return err.message;
+      return msg || 'Ship placement failed on this server.';
     }
 
     async function ensureJoined(gameId = state.gameId) {
@@ -1179,7 +1261,7 @@
             await api(`/api/games/${state.gameId}/place`, { method:'POST', body: JSON.stringify({ player_id: state.playerId, ships: officialShipCells(planned) }) });
             toast('Re-joined game and submitted compatibility placement.');
           } else {
-            throw new Error(officialErr.message || enhancedErr.message);
+            throw new Error(shipPlacementHelpMessage(officialErr) || shipPlacementHelpMessage(enhancedErr));
           }
         }
       }
@@ -1279,6 +1361,7 @@
     $('submitShipsBtn').onclick = () => submitShips().catch(err => toast(err.message));
 
     setTheme(localStorage.getItem('fc_theme') || 'dark');
+    populateServerDropdown();
     updateServerUi();
     if (state.username) { $('loginUsernameInput').value = state.username; }
     updateBadges();
