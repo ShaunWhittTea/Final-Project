@@ -394,10 +394,9 @@
           </div>
 
           <div class="panel lobby-card"><div class="panel-inner stack">
-            <div class="section-title"><h3>All-Time Leaderboard</h3><button class="btn-small" id="refreshLeaderboardBtn">Refresh</button></div>
-            <div class="self-stats-grid" id="myAllTimeStats"></div>
-            <div class="leaderboard-list" id="allTimeLeaderboard"></div>
-            <div class="tiny muted">Uses <b>GET /api/players/{player_id}/stats</b>. If a server does not list players, the client scans common player IDs.</div>
+            <div class="section-title"><h3>All-Time Stats</h3><span class="pill">Records</span></div>
+            <p class="tiny muted">View your career stats and the all-time leaderboard for the current server.</p>
+            <button class="btn-primary" id="openStatsPageBtn">Open Stats & Leaderboard</button>
           </div></div>
         </section>
 
@@ -418,6 +417,26 @@
           </div></div>
         </section>
       </div>
+    </main>
+
+    <main id="statsPage" class="page">
+      <section class="panel game-header">
+        <div>
+          <h2>All-Time Stats & Leaderboard</h2>
+          <div class="status-strip"><span class="pill" id="statsServerPill">Current server</span></div>
+        </div>
+        <div class="controls"><button id="refreshLeaderboardBtn">Refresh</button><button id="backToLobbyFromStatsBtn">Back to lobby</button></div>
+      </section>
+
+      <section class="panel lobby-card"><div class="panel-inner stack">
+        <div class="section-title"><h3>Your All-Time Stats</h3><span class="pill" id="statsPlayerPill">Signed in</span></div>
+        <div class="self-stats-grid" id="myAllTimeStats"></div>
+      </div></section>
+
+      <section class="panel lobby-card"><div class="panel-inner stack">
+        <div class="section-title"><h3>All-Time Leaderboard</h3><span class="pill">All players</span></div>
+        <div class="leaderboard-list" id="allTimeLeaderboard"></div>
+      </div></section>
     </main>
 
     <main id="gamePage" class="page">
@@ -782,6 +801,7 @@
     function showPage(name) {
       $('authPage').classList.toggle('active', name === 'auth');
       $('lobbyPage').classList.toggle('active', name === 'lobby');
+      $('statsPage').classList.toggle('active', name === 'stats');
       $('gamePage').classList.toggle('active', name === 'game');
       document.body.classList.toggle('game-active', name === 'game');
     }
@@ -790,6 +810,14 @@
       $('playerBadge').textContent = state.playerId ? `${state.username} #${state.playerId}` : 'No player';
       $('signedInPill').textContent = state.playerId ? `Signed in as ${state.username} #${state.playerId}` : 'Signed out';
       $('signOutBtn').hidden = !state.playerId;
+    }
+
+    function openStatsPage() {
+      if (!state.playerId) { toast('Sign in before viewing stats.'); return; }
+      $('statsServerPill').textContent = serverBase();
+      $('statsPlayerPill').textContent = `${state.username || 'Player'} #${state.playerId}`;
+      showPage('stats');
+      refreshLeaderboard();
     }
 
     function setSession(data) {
@@ -1532,6 +1560,8 @@
     $('loginPlayerBtn').onclick = () => loginPlayer().catch(err => toast(err.message));
     $('createGameBtn').onclick = () => createGame().catch(err => toast(err.message));
     $('refreshGamesBtn').onclick = refreshOpenGames;
+    $('openStatsPageBtn').onclick = openStatsPage;
+    $('backToLobbyFromStatsBtn').onclick = () => { showPage('lobby'); refreshOpenGames(); };
     $('refreshLeaderboardBtn').onclick = () => refreshLeaderboard();
     $('joinByIdBtn').onclick = () => { const id = Number($('joinGameIdInput').value); id ? joinGame(id).catch(err => toast(err.message)) : toast('Enter a valid game ID.'); };
     $('refreshGameBtn').onclick = () => refreshGame(false);
