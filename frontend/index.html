@@ -716,10 +716,16 @@
     async function refreshGame(noToast) {
       if (!state.gameId || !state.playerId) return;
       try {
-        const [boards, moves] = await Promise.all([
-          api(`/api/games/${state.gameId}/boards?viewer_player_id=${state.playerId}`),
-          api(`/api/games/${state.gameId}/moves`)
-        ]);
+        let boards;
+        let moves = { moves: [] };
+        try {
+          [boards, moves] = await Promise.all([
+            api(`/api/games/${state.gameId}/boards?viewer_player_id=${state.playerId}`),
+            api(`/api/games/${state.gameId}/moves`).catch(() => ({ moves: [] }))
+          ]);
+        } catch (primaryErr) {
+          boards = await loadGameCompat(primaryErr);
+        }
         state.boards = boards;
         state.moves = moves.moves || [];
         renderGame();
@@ -727,9 +733,112 @@
         if (!noToast) toast(err.message);
         if (!state.boards && $('boardsArea')) {
           $('gameTitle').textContent = `Battle Room #${state.gameId}`;
-          $('boardsArea').innerHTML = `<div class="board-card"><h2>Could not load this game</h2><p class="muted">${err.message}</p><p class="tiny muted">If you switched to another team’s server, sign in on that server and join/create a game there. Their server may not support WebSockets, so the app will use REST sync instead.</p></div>`;
+          $('boardsArea').innerHTML = `<div class="board-card"><h2>Could not load this game</h2><p class="muted">${err.message}</p><p class="tiny muted">This server is reachable, but it does not appear to expose the board endpoint format this frontend needs. Create/join worked, but loading the actual boards failed.</p><p class="tiny muted">Needed: <code>/api/games/${state.gameId}/boards?viewer_player_id=${state.playerId}</code>, or a compatible board endpoint.</p></div>`;
         }
       }
+    }
+
+    async function loadGameCompat(primaryErr) {
+      const game = await api(`/api/games/${state.gameId}`).catch(() => null);
+      if (!game) throw primaryErr;
+
+      const players = normalizePlayers(game.players || game.game_players || game.participants || []);
+      if (!players.length) {
+        throw new Error(`Game #${state.gameId} exists, but this server did not return a player list in /api/games/${state.gameId}.`);
+      }
+
+      const gridSize = Number(game.grid_size || game.gridSize || game.size || 8);
+      const boards = [];
+      let loadedAnyBoard = false;
+
+      for (const player of players) {
+        const rawBoard = await tryBoardEndpoints(player.player_id);
+        if (rawBoard) loadedAnyBoard = true;
+        boards.push(makeCompatBoard(player, rawBoard, gridSize, game));
+      }
+
+      if (!loadedAnyBoard) {
+        throw new Error(`Game #${state.gameId} exists, but this server does not provide a compatible board-view endpoint. It returned 404 for our /boards request, so the frontend cannot draw the battle grid.`);
+      }
+
+      return {
+        game_id: Number(game.game_id || game.id || state.gameId),
+        grid_size: gridSize,
+        max_players: Number(game.max_players || game.maxPlayers || players.length || 2),
+        status: game.status || game.game_status || 'waiting_setup',
+        current_turn_player_id: game.current_turn_player_id || game.currentPlayerId || game.current_player_id || null,
+        your_turn: Number(game.current_turn_player_id || game.currentPlayerId || game.current_player_id) === Number(state.playerId),
+        winner_id: game.winner_id || game.winnerId || null,
+        boards
+      };
+    }
+
+    function normalizePlayers(players) {
+      return players.map((p, index) => ({
+        player_id: Number(p.player_id || p.playerId || p.id),
+        username: p.username || p.name || p.display_name || `Player ${p.player_id || p.playerId || p.id}`,
+        turn_order: Number(p.turn_order ?? p.turnOrder ?? index),
+        placed: Boolean(p.placed ?? p.ships_placed ?? p.has_placed_ships ?? p.ready ?? false),
+        eliminated: Boolean(p.eliminated ?? false)
+      })).filter(p => Number.isFinite(p.player_id));
+    }
+
+    async function tryBoardEndpoints(playerId) {
+      const candidates = [
+        `/api/test/games/${state.gameId}/board/${playerId}`,
+        `/api/test/games/${state.gameId}/board?player_id=${playerId}`,
+        `/test/games/${state.gameId}/board/${playerId}`,
+        `/test/games/${state.gameId}/board?player_id=${playerId}`,
+        `/api/games/${state.gameId}/board/${playerId}`,
+        `/api/games/${state.gameId}/board?player_id=${playerId}`,
+        `/api/games/${state.gameId}/players/${playerId}/board`
+      ];
+      for (const path of candidates) {
+        try { return await api(path); } catch (_) {}
+      }
+      return null;
+    }
+
+    function makeCompatBoard(player, raw, size, game) {
+      const grid = normalizeGrid(raw?.grid || raw?.board || raw?.cells, size, Number(player.player_id) === Number(state.playerId));
+      const ships = raw?.ships || raw?.ship_cells || [];
+      const hits = raw?.hits || [];
+      const misses = raw?.misses || [];
+      for (const [r, c] of hits) if (grid[r] && grid[r][c] !== undefined) grid[r][c] = 'hit';
+      for (const [r, c] of misses) if (grid[r] && grid[r][c] !== undefined) grid[r][c] = 'miss';
+      const shipCells = countCells(grid, 'ship') + countCells(grid, 'hit') + countCells(grid, 'sunk');
+      const hitCells = countCells(grid, 'hit') + countCells(grid, 'sunk');
+      const placed = player.placed || shipCells > 0 || ships.length > 0 || ['playing', 'finished'].includes(game.status);
+      return {
+        player_id: player.player_id,
+        username: player.username,
+        turn_order: player.turn_order,
+        is_viewer: Number(player.player_id) === Number(state.playerId),
+        is_current_turn: Number(game.current_turn_player_id || game.currentPlayerId || game.current_player_id) === Number(player.player_id),
+        placed,
+        eliminated: placed && shipCells > 0 && hitCells >= shipCells,
+        ships_remaining: Math.max(0, shipCells - hitCells),
+        grid
+      };
+    }
+
+    function normalizeGrid(rawGrid, size, isViewer) {
+      const grid = Array.from({ length: size }, () => Array.from({ length: size }, () => 'empty'));
+      if (!rawGrid) return grid;
+      for (let r = 0; r < Math.min(size, rawGrid.length); r++) {
+        for (let c = 0; c < Math.min(size, rawGrid[r].length); c++) {
+          const value = String(rawGrid[r][c] ?? '').toLowerCase();
+          if (['hit', 'h', 'x', 'sunk'].includes(value)) grid[r][c] = value === 'sunk' ? 'sunk' : 'hit';
+          else if (['miss', 'm', 'o', '*'].includes(value)) grid[r][c] = 'miss';
+          else if (['ship', 's', 'occupied', 'boat'].includes(value)) grid[r][c] = isViewer ? 'ship' : 'empty';
+          else grid[r][c] = 'empty';
+        }
+      }
+      return grid;
+    }
+
+    function countCells(grid, kind) {
+      return grid.reduce((total, row) => total + row.filter(cell => cell === kind).length, 0);
     }
 
     function showResultModal(kind, winnerName) {
