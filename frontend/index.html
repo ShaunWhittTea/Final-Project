@@ -727,7 +727,8 @@
       state.socket.on('game_changed', data => {
         if (Number(data.game_id) === Number(state.gameId)) refreshGame(false);
       });
-      state.socket.on('open_games_changed', refreshOpenGames);
+      // Do not auto-fetch /api/games from socket lobby events.
+      // The open games list is refreshed only on login, manual Refresh, create/join/leave.
 
       setTimeout(() => {
         if (!state.socketLive) $('socketStatus').textContent = '● REST sync';
@@ -1426,11 +1427,11 @@
     } else {
       showPage('auth');
     }
+    // Keep a fallback refresh only while actively inside a game and Socket.IO is not live.
+    // Do not poll /api/games in the lobby; that endpoint is refreshed manually or after actions.
     state.refreshTimer = setInterval(() => {
-      if (state.playerId && !state.gameId) refreshOpenGames();
       if (state.gameId && !state.socketLive) refreshGame(true);
     }, 2500);
-    setInterval(() => { if (state.playerId && !state.gameId) refreshOpenGames(); }, 12000);
   </script>
 </body>
 </html>
