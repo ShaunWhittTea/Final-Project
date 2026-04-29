@@ -305,6 +305,18 @@
     #signOutBtn[hidden] { display:none; }
     @media (max-width: 980px) { .lobby-grid, .auth-actions { grid-template-columns: 1fr; } }
 
+
+    /* CPU-friendly professional skin: no blur filters, fixed paint masks, transform hover, or heavy shadows. */
+    body::before { display: none !important; }
+    .topbar, .panel, .result-modal { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+    .result-card::before { display: none !important; filter: none !important; }
+    button { transition: background-color .12s ease, border-color .12s ease, color .12s ease !important; }
+    button:hover:not(:disabled), .cell.clickable:hover { transform: none !important; box-shadow: none !important; }
+    .topbar, .panel, .board-card, .toast div, .result-card { box-shadow: 0 8px 22px rgba(0,0,0,.18) !important; }
+    .cell, .cell.ship, .cell.preview, .cell.sunk, .cell.hit, .cell.miss { box-shadow: none !important; }
+    .cell.clickable:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .topbar, .panel { background: var(--surface2) !important; }
+    .feature, .game-card, .board-card, .stat-card, .move { background: rgba(255,255,255,.06) !important; }
   </style>
 </head>
 <body>
@@ -561,6 +573,8 @@
       state.moves = [];
       state.plannedShips = [];
       state.lastResultModalKey = null;
+      state.playerStatsCache = {};
+      state.playerStatsRequested = {};
       localStorage.removeItem('fc_player_id');
       localStorage.removeItem('fc_username');
       localStorage.removeItem('fc_game_id');
@@ -689,6 +703,8 @@
       state.moves = [];
       state.plannedShips = [];
       state.lastResultModalKey = null;
+      state.playerStatsCache = {};
+      state.playerStatsRequested = {};
       hideResultModal();
       localStorage.removeItem('fc_player_id');
       localStorage.removeItem('fc_username');
@@ -736,6 +752,7 @@
       const username = $('createUsernameInput').value.trim();
       if (!username) return toast('Enter a new username first.');
       const data = await api('/api/players', { method: 'POST', body: JSON.stringify({ username }) });
+      data.username = data.username || username;
       setSession(data);
       toast(`Created and signed in as ${state.username}.`);
     }
@@ -1075,12 +1092,14 @@
       const localShots = getStoredShotMap();
       const normalized = moveArray(rawMoves).map(m => normalizeMove(m, players)).filter(m => Number.isFinite(m.row) && Number.isFinite(m.col));
       normalized.forEach(m => {
-        const key = `${m.player_id}:${m.row}:${m.col}`;
-        if (!m.target_player_id && localShots[key]?.target_player_id) m.target_player_id = Number(localShots[key].target_player_id);
-        if (!m.result && localShots[key]?.result) m.result = localShots[key].result;
+        const legacyKey = `${m.player_id}:${m.row}:${m.col}`;
+        const targetedKey = m.target_player_id ? `${m.player_id}:${m.target_player_id}:${m.row}:${m.col}` : legacyKey;
+        const local = localShots[targetedKey] || localShots[legacyKey];
+        if (!m.target_player_id && local?.target_player_id) m.target_player_id = Number(local.target_player_id);
+        if (!m.result && local?.result) m.result = local.result;
       });
       Object.values(localShots).forEach(local => {
-        if (!normalized.some(m => Number(m.player_id) === Number(local.player_id) && Number(m.row) === Number(local.row) && Number(m.col) === Number(local.col))) {
+        if (!normalized.some(m => Number(m.player_id) === Number(local.player_id) && Number(m.target_player_id) === Number(local.target_player_id) && Number(m.row) === Number(local.row) && Number(m.col) === Number(local.col))) {
           normalized.push(local);
         }
       });
@@ -1342,7 +1361,7 @@
       const localMove = { move_number: moveNumber, player_id: state.playerId, target_player_id: Number(target_player_id), row, col, result };
       state.moves.push(localMove);
       const shotMap = getStoredShotMap();
-      shotMap[`${state.playerId}:${row}:${col}`] = localMove;
+      shotMap[`${state.playerId}:${target_player_id}:${row}:${col}`] = localMove;
       saveStoredShotMap(shotMap);
       renderGame();
     }
@@ -1371,18 +1390,47 @@
       } catch (err) { toast(err.message); }
     }
 
-    function renderStats() {
+    async function loadLifetimeStatsForPlayers(players) {
+      const uniqueIds = [...new Set((players || []).map(p => Number(p.player_id)).filter(Boolean))];
+      await Promise.all(uniqueIds.map(async playerId => {
+        const cached = state.playerStatsCache[playerId];
+        const requestedAt = state.playerStatsRequested[playerId] || 0;
+        if (cached || Date.now() - requestedAt < 12000) return;
+        state.playerStatsRequested[playerId] = Date.now();
+        try {
+          // Phase 1-compatible endpoint: keep the response body to the 6 required fields only.
+          const stats = await api(`/api/players/${playerId}/stats`);
+          state.playerStatsCache[playerId] = stats;
+        } catch (_) {
+          state.playerStatsCache[playerId] = null;
+        }
+      }));
+    }
+
+    function refreshLifetimeStatsForPlayers(players) {
+      loadLifetimeStatsForPlayers(players).then(() => {
+        if (state.boards && $('statsArea')) renderStats(false);
+      });
+    }
+
+    function renderStats(shouldFetchLifetime = true) {
       const players = state.boards.boards;
+      if (shouldFetchLifetime) refreshLifetimeStatsForPlayers(players);
       $('statsArea').innerHTML = players.map(p => {
         const shots = state.moves.filter(m => Number(m.player_id) === Number(p.player_id));
         const hits = shots.filter(m => m.result === 'hit').length;
-        const accuracy = shots.length ? Math.round((hits / shots.length) * 100) : 0;
+        const gameAccuracy = shots.length ? Math.round((hits / shots.length) * 100) : 0;
+        const lifetime = state.playerStatsCache[Number(p.player_id)];
+        const lifetimeAccuracy = lifetime ? Math.round(Number(lifetime.accuracy || 0) * 100) : null;
         return `<div class="stat-card"><strong>${p.username}${p.is_viewer ? ' (You)' : ''}</strong>
           <div class="stat-line"><span>Status</span><b>${!p.placed ? 'Placing ships' : p.eliminated ? 'Eliminated' : 'Active'}</b></div>
           <div class="stat-line"><span>Ships afloat</span><b>${p.ships_remaining}</b></div>
-          <div class="stat-line"><span>Shots</span><b>${shots.length}</b></div>
-          <div class="stat-line"><span>Hits</span><b>${hits}</b></div>
-          <div class="stat-line"><span>Accuracy</span><b>${accuracy}%</b></div></div>`;
+          <div class="stat-line"><span>This game shots</span><b>${shots.length}</b></div>
+          <div class="stat-line"><span>This game hits</span><b>${hits}</b></div>
+          <div class="stat-line"><span>This game accuracy</span><b>${gameAccuracy}%</b></div>
+          <div class="stat-line"><span>Lifetime record</span><b>${lifetime ? `${lifetime.wins}-${lifetime.losses}` : 'Loading'}</b></div>
+          <div class="stat-line"><span>Lifetime shots</span><b>${lifetime ? lifetime.total_shots : '—'}</b></div>
+          <div class="stat-line"><span>Lifetime accuracy</span><b>${lifetime ? `${lifetimeAccuracy}%` : '—'}</b></div></div>`;
       }).join('');
     }
 
