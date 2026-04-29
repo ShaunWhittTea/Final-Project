@@ -4,7 +4,7 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --worker-class eventlet -w 1 --timeout 120 app:app
+    startCommand: gunicorn --worker-class eventlet -w 1 app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
@@ -16,9 +16,3 @@ services:
         sync: false
       - key: AUTO_RESET_ON_START
         value: "false"
-      - key: DB_POOL_MIN_SIZE
-        value: "1"
-      - key: DB_POOL_MAX_SIZE
-        value: "4"
-      - key: DB_CONNECT_TIMEOUT
-        value: "5"
