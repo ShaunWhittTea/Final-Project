@@ -394,10 +394,9 @@
           </div>
 
           <div class="panel lobby-card"><div class="panel-inner stack">
-            <div class="section-title"><h3>All-Time Leaderboard</h3><button class="btn-small" id="refreshLeaderboardBtn">Refresh</button></div>
-            <div class="self-stats-grid" id="myAllTimeStats"></div>
-            <div class="leaderboard-list" id="allTimeLeaderboard"></div>
-            <div class="tiny muted">View all-time player stats and rankings for the current server.</div>
+            <div class="section-title"><h3>All-Time Stats</h3><span class="pill">Records</span></div>
+            <p class="tiny muted">View your career stats and the all-time leaderboard for the current server.</p>
+            <button type="button" class="btn-primary" id="openStatsPageBtn" onclick="openStatsPage()">Open Stats & Leaderboard</button>
           </div></div>
         </section>
 
@@ -418,6 +417,26 @@
           </div></div>
         </section>
       </div>
+    </main>
+
+    <main id="statsPage" class="page">
+      <section class="panel game-header">
+        <div>
+          <h2>All-Time Stats & Leaderboard</h2>
+          <div class="status-strip"><span class="pill" id="statsServerPill">Current server</span></div>
+        </div>
+        <div class="controls"><button id="refreshLeaderboardBtn">Refresh</button><button id="backToLobbyFromStatsBtn">Back to lobby</button></div>
+      </section>
+
+      <section class="panel lobby-card"><div class="panel-inner stack">
+        <div class="section-title"><h3>Your All-Time Stats</h3><span class="pill" id="statsPlayerPill">Signed in</span></div>
+        <div class="self-stats-grid" id="myAllTimeStats"></div>
+      </div></section>
+
+      <section class="panel lobby-card"><div class="panel-inner stack">
+        <div class="section-title"><h3>All-Time Leaderboard</h3><span class="pill">All players</span></div>
+        <div class="leaderboard-list" id="allTimeLeaderboard"></div>
+      </div></section>
     </main>
 
     <main id="gamePage" class="page">
@@ -540,6 +559,10 @@
 
     function apiUrl(path) {
       return `${state.serverUrl || DEFAULT_SERVER_URL}${path}`;
+    }
+
+    function isDefaultServer() {
+      return normalizeServerUrl(state.serverUrl || DEFAULT_SERVER_URL) === normalizeServerUrl(DEFAULT_SERVER_URL);
     }
 
     function populateServerDropdown() {
@@ -685,12 +708,10 @@
           const id = normalizePlayerId(p);
           if (id) ids.set(id, p.username || p.name || ids.get(id) || `Player #${id}`);
         }
-      } catch (_) {
-        // Official compatibility path: /api/players is not required, so scan common IDs.
-      }
+      } catch (_) {}
 
       if (ids.size < 2) {
-        for (let id = 1; id <= 60; id++) ids.set(id, ids.get(id) || `Player #${id}`);
+        for (let id = 1; id <= 25; id++) ids.set(id, ids.get(id) || `Player #${id}`);
       }
       return [...ids.entries()].map(([id, username]) => ({ id, username }));
     }
@@ -704,7 +725,7 @@
       try {
         const candidates = await discoverPlayerIdsForStats();
         const results = [];
-        const batchSize = 8;
+        const batchSize = 4;
         for (let i = 0; i < candidates.length; i += batchSize) {
           const batch = candidates.slice(i, i + batchSize);
           const batchResults = await Promise.all(batch.map(async p => {
@@ -782,6 +803,7 @@
     function showPage(name) {
       $('authPage').classList.toggle('active', name === 'auth');
       $('lobbyPage').classList.toggle('active', name === 'lobby');
+      $('statsPage').classList.toggle('active', name === 'stats');
       $('gamePage').classList.toggle('active', name === 'game');
       document.body.classList.toggle('game-active', name === 'game');
     }
@@ -791,6 +813,16 @@
       $('signedInPill').textContent = state.playerId ? `Signed in as ${state.username} #${state.playerId}` : 'Signed out';
       $('signOutBtn').hidden = !state.playerId;
     }
+
+    function openStatsPage() {
+      if (!state.playerId) { toast('Sign in before viewing stats.'); return; }
+      $('statsServerPill').textContent = serverBase();
+      $('statsPlayerPill').textContent = `${state.username || 'Player'} #${state.playerId}`;
+      showPage('stats');
+      if ($('allTimeLeaderboard')) $('allTimeLeaderboard').innerHTML = '<div class="tiny muted">Click Refresh to load the leaderboard.</div>';
+      if ($('myAllTimeStats')) $('myAllTimeStats').innerHTML = '<div class="tiny muted">Click Refresh to load your stats.</div>';
+    }
+    window.openStatsPage = openStatsPage;
 
     function setSession(data) {
       state.playerId = Number(data.player_id ?? data.id ?? data.playerId ?? data.player?.player_id ?? data.data?.player_id);
@@ -802,7 +834,6 @@
       updateBadges();
       showPage('lobby');
       refreshOpenGames();
-      refreshLeaderboard();
     }
 
     function signOut() {
@@ -826,16 +857,19 @@
 
     function setupSocket() {
       state.socketLive = false;
-      if (!window.io) {
+      if (state.socket) {
+        state.socket.disconnect();
+        state.socket = null;
+      }
+      if (!window.io || !isDefaultServer()) {
         $('socketStatus').textContent = '● REST sync';
         return;
       }
-      if (state.socket) state.socket.disconnect();
       $('socketStatus').textContent = '● Connecting';
       state.socket = io(state.serverUrl || DEFAULT_SERVER_URL, {
         transports: ['websocket', 'polling'],
         timeout: 1800,
-        reconnectionAttempts: 2
+        reconnectionAttempts: 1
       });
       state.socket.on('connect', () => {
         state.socketLive = true;
@@ -958,7 +992,6 @@
       hideResultModal();
       showPage('lobby');
       refreshOpenGames();
-      refreshLeaderboard();
     }
 
     async function refreshOpenGames() {
@@ -1532,6 +1565,11 @@
     $('loginPlayerBtn').onclick = () => loginPlayer().catch(err => toast(err.message));
     $('createGameBtn').onclick = () => createGame().catch(err => toast(err.message));
     $('refreshGamesBtn').onclick = refreshOpenGames;
+    $('openStatsPageBtn').onclick = event => {
+      event.preventDefault();
+      openStatsPage();
+    };
+    $('backToLobbyFromStatsBtn').onclick = () => { showPage('lobby'); refreshOpenGames(); };
     $('refreshLeaderboardBtn').onclick = () => refreshLeaderboard();
     $('joinByIdBtn').onclick = () => { const id = Number($('joinGameIdInput').value); id ? joinGame(id).catch(err => toast(err.message)) : toast('Enter a valid game ID.'); };
     $('refreshGameBtn').onclick = () => refreshGame(false);
@@ -1550,16 +1588,15 @@
     renderShipPicker();
     if (state.playerId) {
       if (state.gameId) enterGame(state.gameId);
-      else { showPage('lobby'); refreshOpenGames(); refreshLeaderboard(); }
+      else { showPage('lobby'); refreshOpenGames(); }
     } else {
       showPage('auth');
     }
     state.refreshTimer = setInterval(() => {
       if (state.playerId && !state.gameId) refreshOpenGames();
-      if (state.gameId && !state.socketLive) refreshGame(true);
-    }, 2500);
+      if (state.gameId && !state.socketLive && $('gamePage').classList.contains('active')) refreshGame(true);
+    }, 3500);
     setInterval(() => { if (state.playerId && !state.gameId) refreshOpenGames(); }, 12000);
-    setInterval(() => { if (state.playerId && !state.gameId) refreshLeaderboard(); }, 60000);
   </script>
 </body>
 </html>
