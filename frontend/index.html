@@ -694,6 +694,7 @@
     }
 
     function signOut() {
+      stopGamePolling();
       clearAllFleetCommandGameStorage();
       if (state.socket && state.gameId) state.socket.emit('leave_game', { game_id: state.gameId });
       state.playerId = null;
@@ -712,32 +713,6 @@
       updateBadges();
       showPage('auth');
       toast('Signed out.');
-    }
-
-    let refreshQueued = false;
-    let refreshInFlight = false;
-    function queueGameRefresh(reason = 'game_update') {
-      if (!state.gameId || !state.playerId) return;
-      if (refreshQueued) return;
-      refreshQueued = true;
-      setTimeout(async () => {
-        refreshQueued = false;
-        if (refreshInFlight) {
-          queueGameRefresh(reason);
-          return;
-        }
-        refreshInFlight = true;
-        try {
-          await refreshGame(true);
-        } finally {
-          refreshInFlight = false;
-        }
-      }, 120);
-    }
-
-    function queueLobbyRefresh() {
-      if (!0 0"lobbyPage")?.classList.contains("active")) return;
-      setTimeout(() => refreshOpenGames(), 120);
     }
 
     function setupSocket() {
@@ -764,18 +739,68 @@
       });
       state.socket.on('disconnect', () => {
         state.socketLive = false;
-        0 0'socketStatus').textContent = '● REST sync';
+        $('socketStatus').textContent = '● REST sync';
       });
-      state.socket.on('game_changed', event => {
-        if (!event || Number(event.game_id) === Number(state.gameId)) queueGameRefresh(event.reason || 'game_changed');
+
+      const gameUpdateEvents = [
+        'game_update',
+        'game_state',
+        'state_update',
+        'shot_fired',
+        'move_made',
+        'fire_result',
+        'ships_placed',
+        'player_joined',
+        'turn_changed',
+        'game_over'
+      ];
+
+      gameUpdateEvents.forEach(eventName => {
+        state.socket.on(eventName, payload => {
+          const incomingGameId = Number(
+            payload?.game_id ??
+            payload?.id ??
+            payload?.gameId ??
+            payload?.game?.game_id ??
+            payload?.data?.game_id ??
+            state.gameId
+          );
+
+          if (!state.gameId) return;
+          if (incomingGameId && incomingGameId !== Number(state.gameId)) return;
+
+          refreshGame(true);
+        });
       });
-      state.socket.on('open_games_changed', () => {
-        queueLobbyRefresh();
-      });
+
+      // Do not auto-fetch /api/games from socket lobby events.
+      // The open games list is refreshed only on login, manual Refresh, create/join/leave.
 
       setTimeout(() => {
         if (!state.socketLive) $('socketStatus').textContent = '● REST sync';
       }, 2200);
+    }
+
+    function startGamePolling() {
+      stopGamePolling();
+      state.refreshTimer = setInterval(() => {
+        const gamePageOpen = $('gamePage')?.classList.contains('active');
+        if (!state.gameId || !state.playerId || !gamePageOpen) return;
+        if (state.refreshInFlight) return;
+
+        state.refreshInFlight = true;
+        Promise.resolve(refreshGame(true)).finally(() => {
+          state.refreshInFlight = false;
+        });
+      }, 1800);
+    }
+
+    function stopGamePolling() {
+      if (state.refreshTimer) {
+        clearInterval(state.refreshTimer);
+        state.refreshTimer = null;
+      }
+      state.refreshInFlight = false;
     }
 
     async function createPlayer() {
@@ -863,9 +888,11 @@
       showPage('game');
       renderShipPicker();
       refreshGame(true);
+      startGamePolling();
     }
 
     function leaveRoom() {
+      stopGamePolling();
       if (state.socket && state.gameId) state.socket.emit('leave_game', { game_id: state.gameId });
       clearCurrentGameBrowserData(state.gameId, state.playerId);
       localStorage.removeItem('fc_game_id');
@@ -1368,8 +1395,7 @@
       saveStoredShips(planned);
       toast('Fleet submitted. Waiting for opponents.');
       state.plannedShips = [];
-      await refreshGame(true);
-      if (state.socket) state.socket.emit('watch_game', { game_id: state.gameId });
+      refreshGame(true);
     }
 
     function applyLocalShot(target_player_id, row, col, result, response) {
@@ -1417,8 +1443,7 @@
         }
         applyLocalShot(target_player_id, row, col, data.result, data);
         toast(data.result === 'hit' ? 'Direct hit!' : 'Miss.');
-        await refreshGame(true);
-        setTimeout(() => queueGameRefresh('shot_settle'), 450);
+        setTimeout(() => refreshGame(true), 450);
       } catch (err) { toast(err.message); }
     }
 
@@ -1504,11 +1529,8 @@
     } else {
       showPage('auth');
     }
-    // Keep a fallback refresh only while actively inside a game and Socket.IO is not live.
-    // Do not poll /api/games in the lobby; that endpoint is refreshed manually or after actions.
-    state.refreshTimer = setInterval(() => {
-      if (state.gameId && !state.socketLive) refreshGame(true);
-    }, 2500);
+    // Game refresh polling is started only by enterGame() and stopped by leave/sign-out.
+    // This keeps opponent moves updating without running background polling in the lobby.
   </script>
 </body>
 </html>
