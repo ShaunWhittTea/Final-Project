@@ -120,6 +120,10 @@
     button:hover:not(:disabled) { transform: translateY(-1px); border-color: color-mix(in srgb, var(--accent) 55%, var(--line2)); box-shadow: 0 10px 24px rgba(79,163,255,.18); }
     button:disabled { cursor:not-allowed; opacity:.48; }
     .btn-primary { border: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; }
+    .btn-primary:hover:not(:disabled) {
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 78%, #020617), color-mix(in srgb, var(--accent2) 78%, #020617)) !important;
+      filter: brightness(.92);
+    }
     html[data-theme="light"] .btn-primary,
     html[data-theme="light"] button.btn-primary {
       background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
@@ -506,6 +510,10 @@
       socketLive: false,
       refreshTimer: null,
       lastResultModalKey: null,
+      playerStatsCache: {},
+      playerStatsRequested: {},
+      playerNames: {},
+      playerDirectoryLoadedAt: 0,
       serverUrl: localStorage.getItem('fc_server_url') || DEFAULT_SERVER_URL
     };
 
@@ -621,6 +629,32 @@
       return data;
     }
 
+    function normalizePlayersPayload(data) {
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.players)) return data.players;
+      if (Array.isArray(data?.data)) return data.data;
+      if (Array.isArray(data?.results)) return data.results;
+      return [];
+    }
+
+    async function loadPlayerDirectory(force = false) {
+      if (!force && Date.now() - Number(state.playerDirectoryLoadedAt || 0) < 30000) return state.playerNames;
+      try {
+        const data = await api('/api/players');
+        const players = normalizePlayersPayload(data);
+        players.forEach(p => {
+          const id = Number(p.player_id ?? p.id ?? p.playerId);
+          const name = p.username ?? p.name ?? p.display_name ?? p.displayName;
+          if (id && name) state.playerNames[id] = String(name);
+        });
+        if (state.playerId && state.username) state.playerNames[Number(state.playerId)] = state.username;
+        state.playerDirectoryLoadedAt = Date.now();
+      } catch (_) {
+        if (state.playerId && state.username) state.playerNames[Number(state.playerId)] = state.username;
+      }
+      return state.playerNames;
+    }
+
     function extractGameId(data) {
       return Number(
         data?.game_id ??
@@ -688,9 +722,10 @@
       localStorage.setItem('fc_player_id', state.playerId);
       localStorage.setItem('fc_username', state.username);
       localStorage.removeItem('fc_game_id');
+      if (state.playerId && state.username) state.playerNames[Number(state.playerId)] = state.username;
       updateBadges();
       showPage('lobby');
-      refreshOpenGames();
+      loadPlayerDirectory(true).finally(() => refreshOpenGames());
     }
 
     function signOut() {
@@ -1096,6 +1131,7 @@
       if (status === 'active') status = 'playing';
 
       const players = (game.players || []).map((p, idx) => {
+        const playerId = Number(p.player_id ?? p.id);
         const rawRemaining = p.ships_remaining ?? p.remaining_ships;
         const hasRemaining = rawRemaining !== undefined && rawRemaining !== null;
         const remaining = hasRemaining ? Number(rawRemaining) : 0;
@@ -1108,8 +1144,8 @@
         const eliminated = status !== 'waiting_setup' && placed && remaining === 0;
 
         return {
-          player_id: Number(p.player_id ?? p.id),
-          username: p.username || p.name || `Player ${p.player_id ?? p.id}`,
+          player_id: playerId,
+          username: p.username || p.name || state.playerNames[playerId] || (playerId === Number(state.playerId) ? state.username : `Player ${playerId}`),
           turn_order: idx,
           ships_remaining: remaining,
           placed,
@@ -1198,6 +1234,7 @@
   if (!state.gameId || !state.playerId) return;
 
   try {
+    await loadPlayerDirectory();
     const localBoards = await getGameAndMovesFallback();
     state.boards = localBoards;
     state.moves = localBoards.moves || [];
@@ -1275,8 +1312,10 @@
     }
 
     function playerName(id) {
-      const b = state.boards?.boards?.find(x => Number(x.player_id) === Number(id));
-      return b ? b.username : `Player ${id}`;
+      const pid = Number(id);
+      if (!pid) return 'Unknown player';
+      const b = state.boards?.boards?.find(x => Number(x.player_id) === pid);
+      return b?.username || state.playerNames[pid] || (pid === Number(state.playerId) ? state.username : `Player ${pid}`);
     }
 
     function renderBoards() {
@@ -1447,19 +1486,19 @@
       } catch (err) { toast(err.message); }
     }
 
-    async function loadLifetimeStatsForPlayers(players) {
+    async function loadLifetimeStatsForPlayers(players, force = false) {
       const uniqueIds = [...new Set((players || []).map(p => Number(p.player_id)).filter(Boolean))];
+      await loadPlayerDirectory();
       await Promise.all(uniqueIds.map(async playerId => {
-        const cached = state.playerStatsCache[playerId];
-        const requestedAt = state.playerStatsRequested[playerId] || 0;
-        if (cached || Date.now() - requestedAt < 12000) return;
+        const requestedAt = Number(state.playerStatsRequested[playerId] || 0);
+        const recentlyRequested = Date.now() - requestedAt < 10000;
+        if (!force && recentlyRequested && state.playerStatsCache[playerId] !== undefined) return;
         state.playerStatsRequested[playerId] = Date.now();
         try {
-          // Phase 1-compatible endpoint: keep the response body to the 6 required fields only.
           const stats = await api(`/api/players/${playerId}/stats`);
           state.playerStatsCache[playerId] = stats;
         } catch (_) {
-          state.playerStatsCache[playerId] = null;
+          if (state.playerStatsCache[playerId] === undefined) state.playerStatsCache[playerId] = null;
         }
       }));
     }
@@ -1474,20 +1513,24 @@
       const players = state.boards.boards;
       if (shouldFetchLifetime) refreshLifetimeStatsForPlayers(players);
       $('statsArea').innerHTML = players.map(p => {
-        const shots = state.moves.filter(m => Number(m.player_id) === Number(p.player_id));
+        const playerId = Number(p.player_id);
+        const displayName = p.username || state.playerNames[playerId] || (playerId === Number(state.playerId) ? state.username : `Player ${playerId}`);
+        const shots = state.moves.filter(m => Number(m.player_id) === playerId);
         const hits = shots.filter(m => m.result === 'hit').length;
         const gameAccuracy = shots.length ? Math.round((hits / shots.length) * 100) : 0;
-        const lifetime = state.playerStatsCache[Number(p.player_id)];
+        const lifetime = state.playerStatsCache[playerId];
         const lifetimeAccuracy = lifetime ? Math.round(Number(lifetime.accuracy || 0) * 100) : null;
-        return `<div class="stat-card"><strong>${p.username}${p.is_viewer ? ' (You)' : ''}</strong>
+        return `<div class="stat-card"><strong>${displayName}${p.is_viewer ? ' (You)' : ''}</strong>
           <div class="stat-line"><span>Status</span><b>${!p.placed ? 'Placing ships' : p.eliminated ? 'Eliminated' : 'Active'}</b></div>
           <div class="stat-line"><span>Ships afloat</span><b>${p.ships_remaining}</b></div>
           <div class="stat-line"><span>This game shots</span><b>${shots.length}</b></div>
           <div class="stat-line"><span>This game hits</span><b>${hits}</b></div>
           <div class="stat-line"><span>This game accuracy</span><b>${gameAccuracy}%</b></div>
-          <div class="stat-line"><span>Lifetime record</span><b>${lifetime ? `${lifetime.wins}-${lifetime.losses}` : 'Loading'}</b></div>
-          <div class="stat-line"><span>Lifetime shots</span><b>${lifetime ? lifetime.total_shots : '—'}</b></div>
-          <div class="stat-line"><span>Lifetime accuracy</span><b>${lifetime ? `${lifetimeAccuracy}%` : '—'}</b></div></div>`;
+          <div class="stat-line"><span>All-time games</span><b>${lifetime ? lifetime.games_played : '—'}</b></div>
+          <div class="stat-line"><span>All-time record</span><b>${lifetime ? `${lifetime.wins}-${lifetime.losses}` : 'Loading'}</b></div>
+          <div class="stat-line"><span>All-time shots</span><b>${lifetime ? lifetime.total_shots : '—'}</b></div>
+          <div class="stat-line"><span>All-time hits</span><b>${lifetime ? lifetime.total_hits : '—'}</b></div>
+          <div class="stat-line"><span>All-time accuracy</span><b>${lifetime ? `${lifetimeAccuracy}%` : '—'}</b></div></div>`;
       }).join('');
     }
 
