@@ -927,6 +927,9 @@
     }
 
     function leaveRoom() {
+      if (state.boards?.status === 'finished' && state.boards?.winner_id) {
+        markGameOverSeen(state.boards.game_id || state.gameId, state.boards.winner_id);
+      }
       stopGamePolling();
       if (state.socket && state.gameId) state.socket.emit('leave_game', { game_id: state.gameId });
       clearCurrentGameBrowserData(state.gameId, state.playerId);
@@ -1277,14 +1280,39 @@
       modal.setAttribute('aria-hidden', 'true');
     }
 
+    function gameOverSeenKey(gameId, winnerId) {
+      const server = encodeURIComponent(state.serverUrl || DEFAULT_SERVER_URL);
+      return `fc_gameover_seen_${server}_${gameId}_${winnerId}`;
+    }
+
+    function markGameOverSeen(gameId, winnerId) {
+      if (!gameId || !winnerId) return;
+      sessionStorage.setItem(gameOverSeenKey(gameId, winnerId), '1');
+    }
+
+    function hasSeenGameOver(gameId, winnerId) {
+      return !!(gameId && winnerId && sessionStorage.getItem(gameOverSeenKey(gameId, winnerId)) === '1');
+    }
+
     function maybeShowGameOverModal(data) {
       if (!data || data.status !== 'finished' || !data.winner_id || !state.playerId) return;
-      const key = `${data.game_id}:${data.winner_id}`;
-      if (state.lastResultModalKey === key) return;
+
+      const gameId = Number(data.game_id || state.gameId);
+      const winnerId = Number(data.winner_id);
+
+      // Do not let a late refresh/socket response reopen the modal after the
+      // player has already returned to the lobby or left this game.
+      if (!state.gameId || Number(state.gameId) !== gameId) return;
+      if (!$('gamePage')?.classList.contains('active')) return;
+
+      const key = `${gameId}:${winnerId}`;
+      if (state.lastResultModalKey === key || hasSeenGameOver(gameId, winnerId)) return;
+
       state.lastResultModalKey = key;
-      const kind = Number(data.winner_id) === Number(state.playerId) ? 'victory' : 'defeat';
-      clearCurrentGameBrowserData(data.game_id || state.gameId, state.playerId);
-      showResultModal(kind, playerName(data.winner_id));
+      markGameOverSeen(gameId, winnerId);
+      const kind = winnerId === Number(state.playerId) ? 'victory' : 'defeat';
+      clearCurrentGameBrowserData(gameId, state.playerId);
+      showResultModal(kind, playerName(winnerId));
     }
 
     function renderGame() {
