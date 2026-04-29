@@ -5,3 +5,4 @@ python-dotenv==1.0.1
 gunicorn==23.0.0
 Flask-SocketIO==5.3.6
 eventlet==0.36.1
+psycopg-pool==3.3.0
