@@ -6,9 +6,13 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --worker-class eventlet -w 1 app:app
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: DATABASE_URL
         sync: false
       - key: TEST_MODE
-        sync: false
+        value: "true"
       - key: TEST_PASSWORD
         sync: false
+      - key: AUTO_RESET_ON_START
+        value: "false"
