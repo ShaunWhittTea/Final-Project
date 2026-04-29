@@ -1121,31 +1121,31 @@
     }
 
     async function refreshGame(noToast) {
-      if (!state.gameId || !state.playerId) return;
-      try {
-        const [boards, moves] = await Promise.all([
-          api(`/api/games/${state.gameId}/boards?viewer_player_id=${state.playerId}`),
-          api(`/api/games/${state.gameId}/moves`).catch(() => [])
-        ]);
-        state.boards = boards;
-        state.moves = moveArray(moves);
-        renderGame();
-      } catch (err) {
-        try {
-          const localBoards = await getGameAndMovesFallback();
-          state.boards = localBoards;
-          state.moves = localBoards.moves || [];
-          renderGame();
-          if (!noToast) toast('Using local board tracking for this server.');
-        } catch (fallbackErr) {
-          if (!noToast) toast(fallbackErr.message || err.message);
-          if (!state.boards && $('boardsArea')) {
-            $('gameTitle').textContent = `Battle Room #${state.gameId}`;
-            $('boardsArea').innerHTML = `<div class="board-card"><h2>Could not load this game</h2><p class="muted">${fallbackErr.message || err.message}</p><p class="tiny muted">This server must support the official game endpoints: GET /api/games/{id}, POST /api/games/{id}/fire, and GET /api/games/{id}/moves.</p></div>`;
-          }
-        }
-      }
+  if (!state.gameId || !state.playerId) return;
+
+  try {
+    const localBoards = await getGameAndMovesFallback();
+    state.boards = localBoards;
+    state.moves = localBoards.moves || [];
+    renderGame();
+  } catch (err) {
+    if (!noToast) toast(err.message);
+
+    if (!state.boards && $('boardsArea')) {
+      $('gameTitle').textContent = `Battle Room #${state.gameId}`;
+      $('boardsArea').innerHTML = `
+        <div class="board-card">
+          <h2>Could not load this game</h2>
+          <p class="muted">${err.message}</p>
+          <p class="tiny muted">
+            This server must support GET /api/games/{id}, 
+            POST /api/games/{id}/fire, and GET /api/games/{id}/moves.
+          </p>
+        </div>
+      `;
     }
+  }
+}
 
     function showResultModal(kind, winnerName) {
       const isVictory = kind === 'victory';
