@@ -886,9 +886,7 @@ def create_player():
                 conn.commit()
 
         return jsonify({
-            "player_id": player["player_id"],
-            "username": player["username"],
-            "displayName": player["username"],
+            "player_id": player["player_id"]
         }), 201
     except UniqueViolation:
         try:
@@ -932,11 +930,8 @@ def get_player_stats(player_id):
 
         return jsonify({
             "games_played": player["total_games"],
-            "games": player["total_games"],
             "wins": player["total_wins"],
             "losses": player["total_losses"],
-            "shots": total_shots,
-            "hits": total_hits,
             "total_shots": total_shots,
             "total_hits": total_hits,
             "accuracy": accuracy,
@@ -1027,8 +1022,7 @@ def create_game():
         notify_game_update(game["game_id"], "game_created")
         return jsonify({
             "game_id": game["game_id"],
-            "grid_size": grid_size,
-            "status": WAITING_STATUS,
+            "status": WAITING_STATUS
         }), 201
     except Exception as ex:
         print(f"Create game error: {ex}")
@@ -1362,8 +1356,19 @@ def fire(game_id):
                             (pid, winner_id, pid, winner_id, pid)
                         )
                 else:
-                    player_count = count_players_in_game(cur, game_id)
-                    next_turn_index = (game["current_turn_index"] + 1) % player_count
+                    turn_rows_after_shot = get_turn_order_rows(cur, game_id)
+                    survivor_set = set(survivors)
+                    next_turn_index = game["current_turn_index"]
+                    next_player_id = None
+
+                    for offset in range(1, len(turn_rows_after_shot) + 1):
+                        candidate_index = (game["current_turn_index"] + offset) % len(turn_rows_after_shot)
+                        candidate = turn_rows_after_shot[candidate_index]
+                        if candidate["player_id"] in survivor_set:
+                            next_turn_index = candidate["turn_order"]
+                            next_player_id = candidate["player_id"]
+                            break
+
                     cur.execute(
                         """
                         UPDATE games
@@ -1373,17 +1378,6 @@ def fire(game_id):
                         (next_turn_index, game_id)
                     )
 
-                    cur.execute(
-                        """
-                        SELECT player_id
-                        FROM game_players
-                        WHERE game_id = %s AND turn_order = %s
-                        """,
-                        (game_id, next_turn_index)
-                    )
-                    next_row = cur.fetchone()
-                    next_player_id = next_row["player_id"] if next_row else None
-
                 conn.commit()
 
         notify_game_update(game_id, "shot_fired")
@@ -1391,7 +1385,6 @@ def fire(game_id):
             "result": result,
             "next_player_id": next_player_id,
             "game_status": game_status,
-            "target_player_id": target_player_id,
         }
         if winner_id is not None:
             response["winner_id"] = winner_id
