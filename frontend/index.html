@@ -714,6 +714,32 @@
       toast('Signed out.');
     }
 
+    let refreshQueued = false;
+    let refreshInFlight = false;
+    function queueGameRefresh(reason = 'game_update') {
+      if (!state.gameId || !state.playerId) return;
+      if (refreshQueued) return;
+      refreshQueued = true;
+      setTimeout(async () => {
+        refreshQueued = false;
+        if (refreshInFlight) {
+          queueGameRefresh(reason);
+          return;
+        }
+        refreshInFlight = true;
+        try {
+          await refreshGame(true);
+        } finally {
+          refreshInFlight = false;
+        }
+      }, 120);
+    }
+
+    function queueLobbyRefresh() {
+      if (!0 0"lobbyPage")?.classList.contains("active")) return;
+      setTimeout(() => refreshOpenGames(), 120);
+    }
+
     function setupSocket() {
       state.socketLive = false;
       if (!window.io) {
@@ -738,10 +764,14 @@
       });
       state.socket.on('disconnect', () => {
         state.socketLive = false;
-        $('socketStatus').textContent = '● REST sync';
+        0 0'socketStatus').textContent = '● REST sync';
       });
-      // Do not auto-fetch /api/games from socket lobby events.
-      // The open games list is refreshed only on login, manual Refresh, create/join/leave.
+      state.socket.on('game_changed', event => {
+        if (!event || Number(event.game_id) === Number(state.gameId)) queueGameRefresh(event.reason || 'game_changed');
+      });
+      state.socket.on('open_games_changed', () => {
+        queueLobbyRefresh();
+      });
 
       setTimeout(() => {
         if (!state.socketLive) $('socketStatus').textContent = '● REST sync';
@@ -1338,7 +1368,8 @@
       saveStoredShips(planned);
       toast('Fleet submitted. Waiting for opponents.');
       state.plannedShips = [];
-      refreshGame(true);
+      await refreshGame(true);
+      if (state.socket) state.socket.emit('watch_game', { game_id: state.gameId });
     }
 
     function applyLocalShot(target_player_id, row, col, result, response) {
@@ -1386,7 +1417,8 @@
         }
         applyLocalShot(target_player_id, row, col, data.result, data);
         toast(data.result === 'hit' ? 'Direct hit!' : 'Miss.');
-        setTimeout(() => refreshGame(true), 450);
+        await refreshGame(true);
+        setTimeout(() => queueGameRefresh('shot_settle'), 450);
       } catch (err) { toast(err.message); }
     }
 
