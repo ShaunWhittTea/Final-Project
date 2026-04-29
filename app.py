@@ -44,7 +44,13 @@ PLACEHOLDER_PLAYER_IDS = {":player_id", "{player_id}"}
 
 app = Flask(__name__)
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="eventlet",
+    ping_interval=20,
+    ping_timeout=30,
+)
 
 
 
@@ -354,14 +360,6 @@ def update_game_to_playing_if_ready(cur, game_id):
 
 
 def normalize_ship_cells(raw_ships, grid_size):
-    """Validate production ship placement.
-
-    New format: one 2-cell ship, one 3-cell ship, and one 5-cell ship:
-      [{"type": "patrol", "coordinates": [[0,0], [0,1]]}, ...]
-
-    The older checkpoint format of three {row, col} single ships is still
-    accepted for backwards compatibility with simple API tests.
-    """
     if not isinstance(raw_ships, list):
         return None
 
@@ -640,6 +638,45 @@ def winner_for_game(cur, game_id):
         return survivors[0]
     return None
 
+def build_grid_from_cached_data(
+    owner_player_id,
+    viewer_player_id,
+    grid_size,
+    reveal_all,
+    ship_cells_by_player,
+    targeted_by_player,
+    viewer_shots_by_target,
+):
+    ship_cells = ship_cells_by_player.get(owner_player_id, set())
+    targeted_by_any = targeted_by_player.get(owner_player_id, {})
+    viewer_shots = viewer_shots_by_target.get(owner_player_id, {})
+
+    grid = []
+    for r in range(grid_size):
+        row_cells = []
+        for c in range(grid_size):
+            cell = "empty"
+            coord = (r, c)
+
+            if owner_player_id == viewer_player_id:
+                targeted_cell = targeted_by_any.get(coord)
+                if coord in ship_cells and targeted_cell and targeted_cell["result"] == "hit":
+                    cell = "sunk"
+                elif coord in ship_cells:
+                    cell = "ship"
+                elif targeted_cell and targeted_cell["result"] == "miss":
+                    cell = "miss"
+            else:
+                if coord in viewer_shots:
+                    cell = "sunk" if viewer_shots[coord] == "hit" else "miss"
+                elif reveal_all and coord in ship_cells:
+                    cell = "ship"
+
+            row_cells.append(cell)
+        grid.append(row_cells)
+
+    return grid
+
 
 def build_boards_payload(cur, game_id, viewer_player_id):
     game = get_game_row(cur, game_id)
@@ -651,23 +688,97 @@ def build_boards_payload(cur, game_id, viewer_player_id):
         return None
 
     turn_rows = get_turn_order_rows(cur, game_id)
+    player_ids = [row["player_id"] for row in turn_rows]
     reveal_all = game["status"] == FINISHED_STATUS
-    current_turn_id = current_turn_player_id(cur, game_id) if game["status"] == PLAYING_STATUS else None
-    winner_id = winner_for_game(cur, game_id) if game["status"] == FINISHED_STATUS else None
+
+    current_turn_id = None
+    if game["status"] == PLAYING_STATUS:
+        for row in turn_rows:
+            if row["turn_order"] == game["current_turn_index"]:
+                current_turn_id = row["player_id"]
+                break
+
+    ship_cells_by_player = {pid: set() for pid in player_ids}
+    ship_counts_by_player = {pid: 0 for pid in player_ids}
+    targeted_by_player = {pid: {} for pid in player_ids}
+    hit_counts_by_player = {pid: 0 for pid in player_ids}
+    viewer_shots_by_target = {pid: {} for pid in player_ids}
+
+    cur.execute(
+        """
+        SELECT player_id, row_index, col_index
+        FROM ships
+        WHERE game_id = %s
+        """,
+        (game_id,)
+    )
+    for row in cur.fetchall():
+        pid = row["player_id"]
+        coord = (row["row_index"], row["col_index"])
+        if pid in ship_cells_by_player:
+            ship_cells_by_player[pid].add(coord)
+            ship_counts_by_player[pid] += 1
+
+    cur.execute(
+        """
+        SELECT attacker_player_id, target_player_id, row_index, col_index, result
+        FROM shots
+        WHERE game_id = %s
+        ORDER BY created_at, shot_id
+        """,
+        (game_id,)
+    )
+    for shot in cur.fetchall():
+        target_pid = shot["target_player_id"]
+        coord = (shot["row_index"], shot["col_index"])
+
+        if target_pid in targeted_by_player:
+            targeted_by_player[target_pid][coord] = {
+                "attacker_player_id": shot["attacker_player_id"],
+                "result": shot["result"],
+            }
+
+        if target_pid in hit_counts_by_player and shot["result"] == "hit":
+            hit_counts_by_player[target_pid] += 1
+
+        if shot["attacker_player_id"] == viewer_player_id and target_pid in viewer_shots_by_target:
+            viewer_shots_by_target[target_pid][coord] = shot["result"]
+
+    remaining_by_player = {
+        pid: max(ship_counts_by_player.get(pid, 0) - hit_counts_by_player.get(pid, 0), 0)
+        for pid in player_ids
+    }
+
+    winner_id = None
+    if game["status"] == FINISHED_STATUS:
+        survivors = [pid for pid in player_ids if remaining_by_player.get(pid, 0) > 0]
+        if len(survivors) == 1:
+            winner_id = survivors[0]
 
     boards = []
     for row in turn_rows:
         owner_id = row["player_id"]
+        placed = ship_counts_by_player.get(owner_id, 0) >= SHIPS_PER_PLAYER
+        ships_remaining = remaining_by_player.get(owner_id, 0)
+
         boards.append({
             "player_id": owner_id,
             "username": row["username"],
             "turn_order": row["turn_order"],
             "is_viewer": owner_id == viewer_player_id,
             "is_current_turn": owner_id == current_turn_id,
-            "placed": player_has_placed(cur, game_id, owner_id),
-            "ships_remaining": ships_remaining_for_player(cur, game_id, owner_id),
-            "eliminated": player_has_placed(cur, game_id, owner_id) and ships_remaining_for_player(cur, game_id, owner_id) == 0,
-            "grid": board_matrix_for_viewer(cur, game_id, owner_id, viewer_player_id, game["grid_size"], reveal_all=reveal_all),
+            "placed": placed,
+            "ships_remaining": ships_remaining,
+            "eliminated": placed and ships_remaining == 0,
+            "grid": build_grid_from_cached_data(
+                owner_id,
+                viewer_player_id,
+                game["grid_size"],
+                reveal_all,
+                ship_cells_by_player,
+                targeted_by_player,
+                viewer_shots_by_target,
+            ),
         })
 
     return {
