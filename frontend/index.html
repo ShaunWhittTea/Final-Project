@@ -724,9 +724,6 @@
         state.socketLive = false;
         $('socketStatus').textContent = '● REST sync';
       });
-      state.socket.on('game_changed', data => {
-        if (Number(data.game_id) === Number(state.gameId)) refreshGame(false);
-      });
       // Do not auto-fetch /api/games from socket lobby events.
       // The open games list is refreshed only on login, manual Refresh, create/join/leave.
 
