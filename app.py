@@ -740,26 +740,7 @@ def health():
 @app.get("/api/players")
 def list_players():
     try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT player_id, username
-                    FROM players
-                    ORDER BY player_id ASC
-                    """
-                )
-                rows = cur.fetchall()
-
-        return jsonify({
-            "players": [
-                {
-                    "player_id": row["player_id"],
-                    "username": row["username"],
-                }
-                for row in rows
-            ]
-        }), 200
+        return jsonify({"players": []}), 200
     except Exception as ex:
         print(f"List players error: {ex}")
         return error_response("internal_error", "Failed to list players", 500)
