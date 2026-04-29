@@ -295,13 +295,27 @@
     .welcome-panel { padding: 28px; }
     .welcome-panel h2 { font-size: clamp(34px, 4vw, 58px); line-height: .95; margin-bottom: 12px; }
     .welcome-panel p { color: var(--muted); font-size: 16px; line-height: 1.55; font-weight: 650; }
-    body.game-active { overflow: auto !important; }
-    .game-page-no-scroll, .game-shell, .game-main, .side-rail, .arena, .boards, .bottom-grid, .stats-grid, .history, .game-list { overflow: visible !important; }
-    .game-shell { height: auto !important; min-height: 0 !important; }
-    .side-rail { align-self: start; }
-    .boards { height: auto !important; }
-    .bottom-grid { max-height: none !important; min-height: 0 !important; }
-    .stats-grid, .history, .game-list { max-height: none !important; }
+    body.game-active { overflow: hidden !important; }
+    .game-shell {
+      height: calc(100vh - 96px) !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+    }
+    .game-main,
+    .arena {
+      overflow: hidden !important;
+    }
+    .boards {
+      overflow: auto !important;
+      height: 100% !important;
+    }
+    .side-rail { align-self: start; overflow: auto !important; }
+    .bottom-grid { max-height: 170px !important; min-height: 135px !important; overflow: hidden !important; }
+    .stats-grid,
+    .history,
+    .game-list {
+      overflow: auto !important;
+    }
     #signOutBtn[hidden] { display:none; }
     @media (max-width: 980px) { .lobby-grid, .auth-actions { grid-template-columns: 1fr; } }
 
@@ -814,6 +828,7 @@
       localStorage.setItem('fc_game_id', state.gameId);
       if (state.playerId) markJoined(state.gameId, state.playerId);
       state.plannedShips = [];
+      lastBoardSignature = '';
       if (state.socket) state.socket.emit('watch_game', { game_id: state.gameId });
       showPage('game');
       renderShipPicker();
@@ -829,6 +844,7 @@
       state.moves = [];
       state.plannedShips = [];
       state.lastResultModalKey = null;
+      lastBoardSignature = '';
       hideResultModal();
       showPage('lobby');
       refreshOpenGames();
@@ -1205,39 +1221,123 @@
       return b ? b.username : `Player ${id}`;
     }
 
+    let lastBoardSignature = '';
+
     function renderBoards() {
       const data = state.boards;
-      $('boardsArea').innerHTML = data.boards.map(board => boardHtml(board, data.grid_size)).join('');
-      $('boardsArea').querySelectorAll('[data-shot]').forEach(cell => {
-        cell.onclick = () => fireShot(cell.dataset.target, Number(cell.dataset.row), Number(cell.dataset.col));
+      const area = $('boardsArea');
+      if (!data || !area) return;
+
+      const signature = JSON.stringify({
+        game_id: data.game_id,
+        size: data.grid_size,
+        status: data.status,
+        your_turn: data.your_turn,
+        current_turn_player_id: data.current_turn_player_id,
+        boards: data.boards.map(b => ({
+          player_id: b.player_id,
+          username: b.username,
+          placed: b.placed,
+          eliminated: b.eliminated,
+          ships_remaining: b.ships_remaining,
+          is_viewer: b.is_viewer,
+          is_current_turn: b.is_current_turn,
+          turn_order: b.turn_order,
+          grid: b.grid
+        })),
+        plannedShips: state.plannedShips
       });
-      $('boardsArea').querySelectorAll('[data-place]').forEach(cell => {
-        cell.onclick = () => placeShipAt(Number(cell.dataset.row), Number(cell.dataset.col));
-        cell.onmouseenter = () => previewShip(Number(cell.dataset.row), Number(cell.dataset.col));
-        cell.onmouseleave = clearPreview;
-      });
+
+      if (signature === lastBoardSignature) return;
+      lastBoardSignature = signature;
+
+      const frag = document.createDocumentFragment();
+      for (const board of data.boards) {
+        frag.appendChild(createBoardElement(board, data.grid_size));
+      }
+      area.replaceChildren(frag);
     }
 
-    function boardHtml(board, size) {
+    function createBoardElement(board, size) {
       const data = state.boards;
       const boardEliminated = board.placed && board.eliminated;
       const canPlace = data.status === 'waiting_setup' && board.is_viewer && !board.placed;
       const canShoot = data.status === 'playing' && data.your_turn && !board.is_viewer && !boardEliminated;
       const planned = board.is_viewer ? plannedCellSet() : new Set();
-      let cells = '';
+
+      const card = document.createElement('article');
+      card.className = `board-card ${board.is_viewer ? 'viewer' : ''} ${board.is_current_turn ? 'current' : ''}`;
+
+      const head = document.createElement('div');
+      head.className = 'board-head';
+
+      const title = document.createElement('div');
+      title.className = 'board-title';
+
+      const strong = document.createElement('strong');
+      strong.textContent = `${board.username}${board.is_viewer ? ' (You)' : ''}`;
+
+      const subtitle = document.createElement('span');
+      subtitle.textContent = `${board.placed ? 'Fleet ready' : 'Placing ships'} · ${board.placed ? `${board.ships_remaining} cells afloat` : 'waiting for deployment'}`;
+
+      title.appendChild(strong);
+      title.appendChild(subtitle);
+
+      const pill = document.createElement('span');
+      pill.className = 'pill';
+      pill.textContent = !board.placed
+        ? 'Placing ships'
+        : boardEliminated
+          ? 'Eliminated'
+          : board.is_current_turn
+            ? 'Turn'
+            : `#${board.turn_order + 1}`;
+
+      head.appendChild(title);
+      head.appendChild(pill);
+
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      grid.style.setProperty('--grid-size', size);
+
       for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
           const val = board.grid[r][c];
-          const plannedClass = planned.has(`${r},${c}`) ? ' ship' : '';
-          const symbol = (val === 'sunk' || val === 'hit') ? '✕' : val === 'miss' ? '•' : val === 'ship' || plannedClass ? '■' : '';
-          const attrs = canPlace ? `data-place="1" data-row="${r}" data-col="${c}"` : canShoot && val === 'empty' ? `data-shot="1" data-target="${board.player_id}" data-row="${r}" data-col="${c}"` : '';
-          cells += `<div class="cell ${val}${plannedClass} ${attrs ? 'clickable' : ''}" ${attrs}>${symbol}</div>`;
+          const key = `${r},${c}`;
+          const isPlanned = planned.has(key);
+
+          const cell = document.createElement('div');
+          cell.className = `cell ${val}${isPlanned ? ' ship' : ''}`;
+
+          if (canPlace) {
+            cell.classList.add('clickable');
+            cell.dataset.place = '1';
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+          } else if (canShoot && val === 'empty') {
+            cell.classList.add('clickable');
+            cell.dataset.shot = '1';
+            cell.dataset.target = board.player_id;
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+          }
+
+          cell.textContent =
+            val === 'sunk' || val === 'hit'
+              ? '✕'
+              : val === 'miss'
+                ? '•'
+                : val === 'ship' || isPlanned
+                  ? '■'
+                  : '';
+
+          grid.appendChild(cell);
         }
       }
-      return `<article class="board-card ${board.is_viewer ? 'viewer' : ''} ${board.is_current_turn ? 'current' : ''}">
-        <div class="board-head"><div class="board-title"><strong>${board.username}${board.is_viewer ? ' (You)' : ''}</strong><span>${board.placed ? 'Fleet ready' : 'Placing ships'} · ${board.placed ? `${board.ships_remaining} cells afloat` : 'waiting for deployment'}</span></div><span class="pill">${!board.placed ? 'Placing ships' : boardEliminated ? 'Eliminated' : board.is_current_turn ? 'Turn' : `#${board.turn_order + 1}`}</span></div>
-        <div class="grid" style="--grid-size:${size}">${cells}</div>
-      </article>`;
+
+      card.appendChild(head);
+      card.appendChild(grid);
+      return card;
     }
 
     function renderShipPicker() {
@@ -1394,6 +1494,42 @@
       $('historyArea').innerHTML = [...state.moves].reverse().slice(0, 60).map(m => `
         <div class="move"><span>#${m.move_number} ${playerName(m.player_id)} → ${playerName(m.target_player_id)} at (${m.row}, ${m.col})</span><b class="${m.result}">${m.result.toUpperCase()}</b></div>`).join('');
     }
+
+    $('boardsArea').addEventListener('click', e => {
+      const cell = e.target.closest('.cell');
+      if (!cell) return;
+
+      if (cell.dataset.shot) {
+        fireShot(
+          cell.dataset.target,
+          Number(cell.dataset.row),
+          Number(cell.dataset.col)
+        );
+      }
+
+      if (cell.dataset.place) {
+        placeShipAt(
+          Number(cell.dataset.row),
+          Number(cell.dataset.col)
+        );
+      }
+    });
+
+    $('boardsArea').addEventListener('mouseover', e => {
+      const cell = e.target.closest('.cell[data-place]');
+      if (!cell) return;
+
+      previewShip(
+        Number(cell.dataset.row),
+        Number(cell.dataset.col)
+      );
+    });
+
+    $('boardsArea').addEventListener('mouseout', e => {
+      const cell = e.target.closest('.cell[data-place]');
+      if (!cell) return;
+      clearPreview();
+    });
 
     $('themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
     $('resultCloseBtn').onclick = hideResultModal;
