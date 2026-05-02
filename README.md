@@ -3,6 +3,9 @@
 CPSC 3750 -- Web Application Development\
 Clemson University
 
+Domain 1 - https://battleship.shaunwhittportfolio.com/
+Domain 2 - https://battleship.jackstiversportfolio.com/
+
 ------------------------------------------------------------------------
 
 # Project Overview
